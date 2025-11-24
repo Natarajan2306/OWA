@@ -59,7 +59,10 @@ define('OWA_AUTH_SALT', 'yourauthsaltgoeshere');
  * Don't forget the slash at the end.
  */
  
-define('OWA_PUBLIC_URL', 'http://domain/path/to/owa/');
+// OWA_PUBLIC_URL will be auto-detected if not set or if placeholder value is used
+// To set manually, uncomment and update the line below:
+// define('OWA_PUBLIC_URL', 'https://yourdomain.com/');
+define('OWA_PUBLIC_URL', '');
 
 /**
  * OWA ERROR HANDLER

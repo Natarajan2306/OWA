@@ -43,8 +43,30 @@ if [ -f "$CONFIG_FILE" ]; then
         if [ -n "$OWA_DB_PORT" ]; then
             sed -i "s/define('OWA_DB_PORT',.*);/define('OWA_DB_PORT', '${OWA_DB_PORT}');/" "$CONFIG_FILE" 2>/dev/null || true
         fi
+        # Handle OWA_PUBLIC_URL - auto-detect if not set
         if [ -n "$OWA_PUBLIC_URL" ]; then
             sed -i "s|define('OWA_PUBLIC_URL',.*);|define('OWA_PUBLIC_URL', '${OWA_PUBLIC_URL}');|" "$CONFIG_FILE" 2>/dev/null || true
+        else
+            # Try to auto-detect from common environment variables
+            # Check for Coolify domain or other common variables
+            if [ -n "$DOMAIN" ]; then
+                # Use HTTPS if available, otherwise HTTP
+                PROTOCOL="https"
+                if [ -n "$FORCE_HTTPS" ] && [ "$FORCE_HTTPS" = "false" ]; then
+                    PROTOCOL="http"
+                fi
+                AUTO_URL="${PROTOCOL}://${DOMAIN}/"
+                sed -i "s|define('OWA_PUBLIC_URL',.*);|define('OWA_PUBLIC_URL', '${AUTO_URL}');|" "$CONFIG_FILE" 2>/dev/null || true
+                echo "Auto-detected public URL: ${AUTO_URL}"
+            elif [ -n "$APP_URL" ]; then
+                # Use APP_URL if available
+                sed -i "s|define('OWA_PUBLIC_URL',.*);|define('OWA_PUBLIC_URL', '${APP_URL}');|" "$CONFIG_FILE" 2>/dev/null || true
+                echo "Using APP_URL: ${APP_URL}"
+            else
+                # Fallback: use a placeholder that will be detected at runtime
+                sed -i "s|define('OWA_PUBLIC_URL',.*);|define('OWA_PUBLIC_URL', '');|" "$CONFIG_FILE" 2>/dev/null || true
+                echo "WARNING: OWA_PUBLIC_URL not set. Will be auto-detected at runtime."
+            fi
         fi
         
         echo "Config file updated with environment variables."
@@ -107,8 +129,30 @@ else
                 if [ -n "$OWA_DB_PORT" ]; then
                     sed -i "s/define('OWA_DB_PORT',.*);/define('OWA_DB_PORT', '${OWA_DB_PORT}');/" "$CONFIG_FILE" 2>/dev/null || true
                 fi
+                # Handle OWA_PUBLIC_URL - auto-detect if not set
                 if [ -n "$OWA_PUBLIC_URL" ]; then
                     sed -i "s|define('OWA_PUBLIC_URL',.*);|define('OWA_PUBLIC_URL', '${OWA_PUBLIC_URL}');|" "$CONFIG_FILE" 2>/dev/null || true
+                else
+                    # Try to auto-detect from common environment variables
+                    # Check for Coolify domain or other common variables
+                    if [ -n "$DOMAIN" ]; then
+                        # Use HTTPS if available, otherwise HTTP
+                        PROTOCOL="https"
+                        if [ -n "$FORCE_HTTPS" ] && [ "$FORCE_HTTPS" = "false" ]; then
+                            PROTOCOL="http"
+                        fi
+                        AUTO_URL="${PROTOCOL}://${DOMAIN}/"
+                        sed -i "s|define('OWA_PUBLIC_URL',.*);|define('OWA_PUBLIC_URL', '${AUTO_URL}');|" "$CONFIG_FILE" 2>/dev/null || true
+                        echo "Auto-detected public URL: ${AUTO_URL}"
+                    elif [ -n "$APP_URL" ]; then
+                        # Use APP_URL if available
+                        sed -i "s|define('OWA_PUBLIC_URL',.*);|define('OWA_PUBLIC_URL', '${APP_URL}');|" "$CONFIG_FILE" 2>/dev/null || true
+                        echo "Using APP_URL: ${APP_URL}"
+                    else
+                        # Fallback: use a placeholder that will be detected at runtime
+                        sed -i "s|define('OWA_PUBLIC_URL',.*);|define('OWA_PUBLIC_URL', '');|" "$CONFIG_FILE" 2>/dev/null || true
+                        echo "WARNING: OWA_PUBLIC_URL not set. Will be auto-detected at runtime."
+                    fi
                 fi
                 
                 echo "Config file updated with environment variables."

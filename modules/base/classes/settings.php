@@ -347,7 +347,29 @@
         }
 
         if (defined('OWA_PUBLIC_URL')) {
-            $this->set('base', 'public_url', OWA_PUBLIC_URL);
+            $public_url = OWA_PUBLIC_URL;
+            // Auto-detect if placeholder or empty
+            if (empty($public_url) || strpos($public_url, 'domain/path/to/owa') !== false || strpos($public_url, 'yourdomain') !== false) {
+                // Auto-detect from server variables
+                $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
+                $host = $_SERVER['HTTP_HOST'] ?? ($_SERVER['SERVER_NAME'] ?? 'localhost');
+                $port = '';
+                if (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] != 80 && $_SERVER['SERVER_PORT'] != 443) {
+                    $port = ':' . $_SERVER['SERVER_PORT'];
+                }
+                $public_url = $protocol . $host . $port . '/';
+            }
+            $this->set('base', 'public_url', $public_url);
+        } else {
+            // Auto-detect if not defined
+            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
+            $host = $_SERVER['HTTP_HOST'] ?? ($_SERVER['SERVER_NAME'] ?? 'localhost');
+            $port = '';
+            if (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] != 80 && $_SERVER['SERVER_PORT'] != 443) {
+                $port = ':' . $_SERVER['SERVER_PORT'];
+            }
+            $public_url = $protocol . $host . $port . '/';
+            $this->set('base', 'public_url', $public_url);
         }
 
         if (defined('OWA_PUBLIC_PATH')) {
