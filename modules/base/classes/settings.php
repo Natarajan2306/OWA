@@ -130,27 +130,53 @@
  
         $file = OWA_DIR.'owa-config.php';
         
+        // Use output buffering to completely suppress any warnings
+        ob_start();
+        
         // Suppress all warnings/errors when config file doesn't exist (normal during installation)
         $old_error_reporting = error_reporting(0);
         $old_display_errors = ini_get('display_errors');
         @ini_set('display_errors', 0);
         
-        if ( file_exists( $file ) && is_readable( $file ) ) {
-            
-            @include_once($file);
-            $this->config_file_loaded = true;
-        } else {
-            // Fallback: try config_file setting
-            $config_file = $this->get('base', 'config_file');
-            if ($config_file && file_exists($config_file) && is_readable($config_file)) {
-                @include_once($config_file);
+        // Check if file exists and is actually readable (not just a broken symlink)
+        $file_exists = false;
+        $file_readable = false;
+        
+        if (file_exists($file)) {
+            $file_exists = true;
+            // Double check it's actually a file and readable
+            if (is_file($file) && is_readable($file)) {
+                $file_readable = true;
+            }
+        }
+        
+        if ($file_exists && $file_readable) {
+            // File exists and is readable, try to include it
+            $included = @include_once($file);
+            if ($included !== false) {
                 $this->config_file_loaded = true;
+            } else {
+                $this->config_file_loaded = false;
+            }
+        } else {
+            // File doesn't exist or isn't readable - try fallback
+            $config_file = $this->get('base', 'config_file');
+            if ($config_file && file_exists($config_file) && is_file($config_file) && is_readable($config_file)) {
+                $included = @include_once($config_file);
+                if ($included !== false) {
+                    $this->config_file_loaded = true;
+                } else {
+                    $this->config_file_loaded = false;
+                }
             } else {
                 // Config file doesn't exist - this is OK during installation
                 // Don't throw warnings, just mark as not loaded
                 $this->config_file_loaded = false;
             }
         }
+        
+        // Discard any output (warnings) that were buffered
+        ob_end_clean();
         
         // Restore error reporting
         error_reporting($old_error_reporting);
