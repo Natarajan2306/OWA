@@ -16,6 +16,12 @@
 // $Id$
 //
 
+// Suppress warnings during installation when config file doesn't exist yet
+// Use output buffering to catch any warnings that might be output
+ob_start();
+error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE);
+ini_set('display_errors', 0);
+
 include_once('owa_env.php');
 require_once(OWA_BASE_DIR.'/owa.php');
 
@@ -57,6 +63,8 @@ if ($owa->isOwaInstalled()) {
 }
 
 if ( $owa->isEndpointEnabled( basename( __FILE__ ) ) ) {
+    // Clear output buffer before outputting content
+    ob_end_clean();
 
     // need third param here so that seting is not persisted.
     $owa->setSetting('base','main_url', 'install.php');
@@ -72,6 +80,8 @@ if ( $owa->isEndpointEnabled( basename( __FILE__ ) ) ) {
     echo $owa->handleRequest($params);
 
 } else {
+    // Clear output buffer
+    ob_end_clean();
     // unload owa
     $owa->restInPeace();
 }

@@ -130,16 +130,20 @@
  
         $file = OWA_DIR.'owa-config.php';
         
-        if ( file_exists( $file ) ) {
+        if ( file_exists( $file ) && is_readable( $file ) ) {
             
-            include_once($file);
+            @include_once($file);
             $this->config_file_loaded = true;
         } else {
             // Fallback: try config_file setting
             $config_file = $this->get('base', 'config_file');
-            if ($config_file && file_exists($config_file)) {
-                include_once($config_file);
+            if ($config_file && file_exists($config_file) && is_readable($config_file)) {
+                @include_once($config_file);
                 $this->config_file_loaded = true;
+            } else {
+                // Config file doesn't exist - this is OK during installation
+                // Don't throw warnings, just mark as not loaded
+                $this->config_file_loaded = false;
             }
         }
      }
@@ -850,7 +854,7 @@
 
          if (file_exists(OWA_DIR.'owa-config.php')) {
              owa_coreAPI::error("Your config file already exists. If you need to change your configuration, edit that file at: ".OWA_DIR.'owa-config.php');
-             require_once(OWA_DIR . 'owa-config.php');
+             @require_once(OWA_DIR . 'owa-config.php');
             return true;
          }
 
@@ -908,7 +912,7 @@
         fclose($handle);
         chmod(OWA_DIR . 'owa-config.php', 0750);
         owa_coreAPI::debug('Config file created');
-        require_once(OWA_DIR . 'owa-config.php');
+        @require_once(OWA_DIR . 'owa-config.php');
         return true;
 
     }

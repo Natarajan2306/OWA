@@ -31,11 +31,26 @@ RUN a2enmod rewrite
 # Increase Apache request line limit to handle long URLs (prevent 414 errors)
 RUN echo "LimitRequestLine 16384" >> /etc/apache2/apache2.conf
 
+# Configure PHP to suppress warnings when config file doesn't exist (during installation)
+# Warnings will be logged but not displayed to prevent "headers already sent" errors
+RUN echo "display_errors = Off" >> /usr/local/etc/php/conf.d/owa.ini && \
+    echo "display_startup_errors = Off" >> /usr/local/etc/php/conf.d/owa.ini && \
+    echo "log_errors = On" >> /usr/local/etc/php/conf.d/owa.ini && \
+    echo "error_log = /var/log/apache2/php_errors.log" >> /usr/local/etc/php/conf.d/owa.ini
+
 # Copy Apache configuration
 COPY apache-config.conf /etc/apache2/sites-available/000-default.conf
 
 # Copy application files
 COPY . .
+
+# Copy deployment initialization script
+COPY deploy-init.sh /usr/local/bin/deploy-init.sh
+RUN chmod +x /usr/local/bin/deploy-init.sh
+
+# Copy entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader
@@ -56,6 +71,6 @@ RUN mkdir -p /var/www/html/owa-data/caches \
 # Expose port 80
 EXPOSE 80
 
-# Start Apache
-CMD ["apache2-foreground"]
+# Start Apache with entrypoint
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 

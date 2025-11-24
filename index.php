@@ -16,6 +16,12 @@
 // $Id$
 //
 
+// Suppress warnings when config file doesn't exist (will redirect to install)
+// Use output buffering to catch any warnings that might be output
+ob_start();
+error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE);
+ini_set('display_errors', 0);
+
 // Prevent redirect loops - reject URLs that are too long or contain nested loginForm redirects
 // This must run BEFORE any other code to catch the issue early
 if (isset($_SERVER['REQUEST_URI'])) {
@@ -45,6 +51,17 @@ if (isset($_SERVER['REQUEST_URI'])) {
 }
 
 require_once('owa_env.php');
+
+// Check if config file exists before loading OWA
+if (!file_exists(OWA_DIR.'owa-config.php')) {
+    // Config file doesn't exist, redirect to install
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $public_url = $protocol . $host . '/';
+    header('Location: ' . $public_url . 'install.php', true, 302);
+    exit;
+}
+
 require_once(OWA_DIR.'owa.php');
 
 /**
@@ -69,9 +86,22 @@ $config = [
 $owa = new owa( $config );
 
 if (!$owa->isOwaInstalled()) {
+    // Clear any output buffer before redirect
+    ob_end_clean();
     // redirect to install
-    owa_lib::redirectBrowser(owa_coreAPI::getSetting('base','public_url').'install.php');
+    $public_url = owa_coreAPI::getSetting('base','public_url');
+    if (!$public_url) {
+        // Fallback if public_url is not set
+        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
+        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $public_url = $protocol . $host . '/';
+    }
+    owa_lib::redirectBrowser($public_url.'install.php');
+    exit;
 }
+
+// Clear output buffer and continue
+ob_end_clean();
 
 if ( $owa->isEndpointEnabled( basename( __FILE__ ) ) ) {
     
