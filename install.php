@@ -19,8 +19,10 @@
 // Suppress warnings during installation when config file doesn't exist yet
 // Use output buffering to catch any warnings that might be output
 ob_start();
-error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE);
+error_reporting(E_ALL);
 ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+ini_set('error_log', '/var/log/apache2/php_errors.log');
 
 include_once('owa_env.php');
 require_once(OWA_BASE_DIR.'/owa.php');
@@ -43,47 +45,92 @@ define('OWA_CACHE_OBJECTS', false);
 define('OWA_INSTALLING', true);
 
 $config = [
-
     'instance_role' => 'installer'
 ];
 
-$owa = new owa( $config );
-
-$owa = new owa( $config );
-
-// If installation is complete, redirect to index.php
-if ($owa->isOwaInstalled()) {
-    $public_url = owa_coreAPI::getSetting('base', 'public_url');
-    // Only redirect if not doing installation actions
-    $do = owa_coreAPI::getRequestParam('do');
-    if (empty($do) || (strpos($do, 'install') === false && strpos($do, 'login') === false && strpos($do, 'passwordReset') === false)) {
-        owa_lib::redirectBrowser($public_url . 'index.php');
-        exit;
-    }
-}
-
-if ( $owa->isEndpointEnabled( basename( __FILE__ ) ) ) {
-    // Clear output buffer before outputting content
-    ob_end_clean();
-
-    // need third param here so that seting is not persisted.
-    $owa->setSetting('base','main_url', 'install.php');
-    // run controller, echo page content
-    $do = owa_coreAPI::getRequestParam('do');
-    $params = array();
-    if (empty($do)) {
-
-        $params['do'] = 'base.installStart';
+try {
+    $owa = new owa( $config );
+    
+    // If installation is complete, redirect to index.php
+    if ($owa->isOwaInstalled()) {
+        $public_url = owa_coreAPI::getSetting('base', 'public_url');
+        // Only redirect if not doing installation actions
+        $do = owa_coreAPI::getRequestParam('do');
+        if (empty($do) || (strpos($do, 'install') === false && strpos($do, 'login') === false && strpos($do, 'passwordReset') === false)) {
+            ob_end_clean();
+            owa_lib::redirectBrowser($public_url . 'index.php');
+            exit;
+        }
     }
 
-    // run controller or view and echo page content
-    echo $owa->handleRequest($params);
+    if ( $owa->isEndpointEnabled( basename( __FILE__ ) ) ) {
+        // Clear output buffer before outputting content
+        ob_end_clean();
 
-} else {
+        // need third param here so that seting is not persisted.
+        $owa->setSetting('base','main_url', 'install.php');
+        // run controller, echo page content
+        $do = owa_coreAPI::getRequestParam('do');
+        $params = array();
+        if (empty($do)) {
+            $params['do'] = 'base.installStart';
+        }
+
+        // run controller or view and echo page content
+        echo $owa->handleRequest($params);
+
+    } else {
+        // Clear output buffer
+        ob_end_clean();
+        // unload owa
+        $owa->restInPeace();
+    }
+} catch (Throwable $e) {
     // Clear output buffer
-    ob_end_clean();
-    // unload owa
-    $owa->restInPeace();
+    $output = ob_get_clean();
+    
+    // Log the error
+    error_log(sprintf('OWA Installation Error: %s in %s:%d', $e->getMessage(), $e->getFile(), $e->getLine()));
+    error_log('Stack trace: ' . $e->getTraceAsString());
+    
+    // Display a friendly error page
+    http_response_code(500);
+    header('Content-Type: text/html; charset=utf-8');
+    ?>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Installation Error - Open Web Analytics</title>
+        <style>
+            body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
+            .error { background: #fee; border: 1px solid #fcc; padding: 20px; border-radius: 5px; }
+            h1 { color: #c00; }
+            pre { background: #f5f5f5; padding: 10px; overflow-x: auto; font-size: 12px; }
+            .info { background: #eef; border: 1px solid #ccf; padding: 15px; margin-top: 20px; border-radius: 5px; }
+        </style>
+    </head>
+    <body>
+        <div class="error">
+            <h1>Installation Error</h1>
+            <p>An error occurred while initializing Open Web Analytics:</p>
+            <pre><?php echo htmlspecialchars($e->getMessage()); ?></pre>
+            <p><strong>File:</strong> <?php echo htmlspecialchars($e->getFile()); ?>:<?php echo $e->getLine(); ?></p>
+            <?php if (!empty($output)): ?>
+            <div class="info">
+                <strong>Output before error:</strong>
+                <pre><?php echo htmlspecialchars($output); ?></pre>
+            </div>
+            <?php endif; ?>
+            <div class="info">
+                <p><strong>Stack Trace:</strong></p>
+                <pre><?php echo htmlspecialchars($e->getTraceAsString()); ?></pre>
+            </div>
+            <p>Please check your server logs for more details.</p>
+        </div>
+    </body>
+    </html>
+    <?php
+    exit;
 }
 
 ?>
