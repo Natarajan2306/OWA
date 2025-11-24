@@ -94,18 +94,26 @@ class owa_db_mysql extends owa_db {
 
         if ( ! $this->connection ) {
 
+            // Get and validate connection parameters
+            $host = $this->getConnectionParam('host');
+            $user = $this->getConnectionParam('user');
+            $password = $this->getConnectionParam('password');
+            $name = $this->getConnectionParam('name');
+            
+            // Validate required parameters
+            if (empty($host) || empty($user) || empty($name)) {
+                $this->e->alert('Database connection parameters are missing or invalid.');
+                $this->connection_status = false;
+                return false;
+            }
+
             // make a persistent connection if need be.
             if ( $this->getConnectionParam('persistant') ) {
-
-                $host = 'p:' . $this->getConnectionParam('host');
-
-            } else {
-
-                $host = $this->getConnectionParam('host');
+                $host = 'p:' . $host;
             }
 
             if ($this->getConnectionParam('port')) {
-                $port = $this->getConnectionParam('port');
+                $port = (int) $this->getConnectionParam('port');
             } else {
                 $port = 3306;
             }
@@ -123,24 +131,32 @@ class owa_db_mysql extends owa_db {
             $this->connection = mysqli_init();
 
             // get a connection
-            mysqli_real_connect(
+            $connect_result = @mysqli_real_connect(
                 $this->connection,
                 $host,
-                $this->getConnectionParam('user'),
-                $this->getConnectionParam('password'),
-                $this->getConnectionParam('name'),
+                $user,
+                $password,
+                $name,
                 $port,
                 $socket,
                 $client_flags
             );
 
+            // Check if connection was successful before using it
+            if ( ! $connect_result || mysqli_connect_error() ) {
+                $error_msg = mysqli_connect_error();
+                // Store the error for retrieval
+                $this->last_error = $error_msg;
+                $this->e->alert('Could not connect to database: ' . $error_msg);
+                $this->connection_status = false;
+                $this->connection = null;
+                return false;
+            }
+
             // explicitly set the character set as UTF-8
             if (function_exists('mysqli_set_charset')) {
-
                 mysqli_set_charset($this->connection, 'utf8' );
-
             } else {
-
                 $this->query("SET NAMES 'utf8'");
             }
 
@@ -150,13 +166,10 @@ class owa_db_mysql extends owa_db {
         }
 
         if ( ! $this->connection ) {
-
             $this->e->alert('Could not connect to database.');
             $this->connection_status = false;
             return false;
-
         } else {
-
             $this->connection_status = true;
             return true;
         }
@@ -309,6 +322,21 @@ class owa_db_mysql extends owa_db {
     function getAffectedRows() {
 
         return mysqli_affected_rows();
+    }
+    
+    /**
+     * Get the last connection error
+     * 
+     * @return string
+     */
+    function getLastError() {
+        if (isset($this->last_error)) {
+            return $this->last_error;
+        }
+        if ($this->connection && mysqli_connect_error()) {
+            return mysqli_connect_error();
+        }
+        return '';
     }
 }
 

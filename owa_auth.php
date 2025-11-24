@@ -416,7 +416,19 @@ class owa_auth extends owa_base {
         owa_coreAPI::debug('auth get user: '. $this->credentials['user_id'] );
         
         $this->u = owa_coreAPI::entityFactory('base.user');
-        $this->u->getByColumn('user_id', $this->credentials['user_id']);
+        
+        // Ensure database connection is established
+        $db = owa_coreAPI::dbSingleton();
+        if ($db) {
+            // Try to connect if not already connected
+            if (method_exists($db, 'connect')) {
+                $db->connect();
+            }
+            // Load user from database
+            $this->u->getByColumn('user_id', $this->credentials['user_id']);
+        } else {
+            owa_coreAPI::debug('Database connection not available for getUser()');
+        }
     }
 
     /**

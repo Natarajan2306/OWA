@@ -43,10 +43,28 @@ class owa_usersResetPasswordController extends owa_controller {
     
         $event = $this->getParam('event');
         
+        if (!$event || !$event->get('email_address')) {
+            $this->e->debug("Password reset event missing email_address");
+            return;
+        }
+        
         $auth = owa_auth::get_instance();
         $u = owa_coreAPI::entityFactory('base.user');
         $u->getByColumn('email_address', $event->get('email_address'));
-        $u->set('temp_passkey', $auth->generateTempPasskey($u->get('user_id')));
+        
+        // Check if user was found
+        if (!$u->wasPersisted()) {
+            $this->e->debug("User not found for email: " . $event->get('email_address'));
+            return;
+        }
+        
+        $user_id = $u->get('user_id');
+        if (!$user_id) {
+            $this->e->debug("User ID is empty for email: " . $event->get('email_address'));
+            return;
+        }
+        
+        $u->set('temp_passkey', $auth->generateTempPasskey($user_id));
         $status = $u->update();
         $this->e->debug('status: '.$status);
         

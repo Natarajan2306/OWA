@@ -549,9 +549,17 @@ class owa_controller extends owa_base {
 		}
 */
 		
+		// Parameters to exclude from redirect to prevent loops
+		$exclude_params = array('params');
+		
+		// If redirecting to loginForm, exclude 'go' parameter to prevent redirect loops
+		if ($do === 'base.loginForm') {
+			$exclude_params[] = 'go';
+		}
+		
 		foreach ($this->data as $k => $param) {
 			
-			if ( ! is_array( $param ) || ! is_object($param) ) {
+			if ( ! is_array( $param ) && ! is_object($param) && ! in_array($k, $exclude_params) ) {
 				
 				$new_data[$k] = $param;
 			}
@@ -673,8 +681,17 @@ class owa_controller extends owa_base {
 			$this->set('error_msg', ['headline'	=> 'Not authenticated.', 'msg' => 'Check API credentials or permissions for this user.'] );
 			http_response_code(401);	
 		} else {
-	        $this->setRedirectAction('base.loginForm');
-			$this->set('go', urlencode(owa_lib::get_current_url()));
+			// Prevent redirect loop - check if we're already on loginForm
+			$current_action = $this->getParam('do');
+			if ($current_action === 'base.loginForm') {
+				// Already on login form, just show it without redirect - don't set go parameter
+				$this->setView('base.loginForm');
+			} else {
+				// Simply redirect to loginForm without any go parameter to prevent loops
+				// User will be redirected to dashboard after login
+				$this->setRedirectAction('base.loginForm');
+				// Explicitly don't set go parameter - it will be excluded by setRedirectAction anyway
+			}
 		}
     }
 

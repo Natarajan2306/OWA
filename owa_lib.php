@@ -694,7 +694,12 @@ class owa_lib {
         $config = $c->fetch('base');
 
         $control_params = array('view_method', 'auth_status');
-
+        
+        // Exclude 'go' parameter when redirecting to loginForm to prevent redirect loops
+        $target_action = isset($data['do']) ? $data['do'] : '';
+        if ($target_action === 'base.loginForm') {
+            $control_params[] = 'go';
+        }
 
         $get = '';
 

@@ -44,6 +44,18 @@ $config = [
 $owa = new owa( $config );
 
 $owa = new owa( $config );
+
+// If installation is complete, redirect to index.php
+if ($owa->isOwaInstalled()) {
+    $public_url = owa_coreAPI::getSetting('base', 'public_url');
+    // Only redirect if not doing installation actions
+    $do = owa_coreAPI::getRequestParam('do');
+    if (empty($do) || (strpos($do, 'install') === false && strpos($do, 'login') === false && strpos($do, 'passwordReset') === false)) {
+        owa_lib::redirectBrowser($public_url . 'index.php');
+        exit;
+    }
+}
+
 if ( $owa->isEndpointEnabled( basename( __FILE__ ) ) ) {
 
     // need third param here so that seting is not persisted.

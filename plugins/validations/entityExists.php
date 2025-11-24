@@ -32,19 +32,37 @@
           
      function validate() {
          
-         $entity = owa_coreAPI::entityFactory($this->getConfig('entity'));
-         $entity->getByColumn($this->getConfig('column'), $this->getValues());
-                  
-         $error = $this->getErrorMsg();
-         
-         if (empty($error)) {
-             $this->setErrorMessage('An entity with that value does not exist.');
-         }
+         try {
+             $entity = owa_coreAPI::entityFactory($this->getConfig('entity'));
+             
+             // Check if database connection is available
+             $db = owa_coreAPI::dbSingleton();
+             if (!$db || (method_exists($db, 'connection_status') && !$db->connection_status)) {
+                 // Database not available, skip validation
+                 return;
+             }
+             
+             $entity->getByColumn($this->getConfig('column'), $this->getValues());
+                      
+             $error = $this->getErrorMsg();
+             
+             if (empty($error)) {
+                 $this->setErrorMessage('An entity with that value does not exist.');
+             }
 
-        $id = $entity->get('id');
-        
-        // validation logic
-         if (empty($id)) {
+            $id = $entity->get('id');
+            
+            // validation logic
+             if (empty($id)) {
+                 $this->hasError();
+             }
+         } catch (Exception $e) {
+             // If there's an error (e.g., table doesn't exist), treat as validation failure
+             owa_coreAPI::debug('EntityExists validation error: ' . $e->getMessage());
+             $error = $this->getErrorMsg();
+             if (empty($error)) {
+                 $this->setErrorMessage('An entity with that value does not exist.');
+             }
              $this->hasError();
          }
      }

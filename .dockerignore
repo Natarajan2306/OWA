@@ -1,0 +1,60 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+LICENCE
+CODE_OF_CONDUCT.md
+CONTRIBUTING.md
+SECURITY.md
+
+# Node modules (will be installed in container)
+node_modules
+npm-debug.log
+.npm-cache
+
+# Composer
+vendor
+composer.lock
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+owa-data/logs/*
+
+# Cache
+owa-data/caches/*
+
+# Test files
+test_*.php
+test_*.html
+
+# Setup scripts (not needed in container)
+QUICK_SETUP.sh
+setup_database.sh
+setup_database.php
+setup_db_simple.sh
+create_owa_db.sh
+create_owa_user.sql
+get_tracking_code.php
+list_users.php
+reset_password.php
+test_db_connection.php
+test_login.php
+test_web_login.php
+
+# Config (will be mounted as volume)
+owa-config.php
+

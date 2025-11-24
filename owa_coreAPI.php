@@ -59,29 +59,33 @@ class owa_coreAPI {
 		
 		if ( $type ) {
         	$connection_class = "owa_db_" . $type;
+            $connection_class_path = OWA_PLUGIN_DIR.'db/' . $connection_class . ".php";
 
-            if ( ! class_exists( $connection_class ) ) {
-	            
-                $connection_class_path = OWA_PLUGIN_DIR.'db/' . $connection_class . ".php";
+            // Always load the database plugin file to ensure constants are defined
+            // even if the class already exists (constants might not be defined)
+            if ( file_exists( $connection_class_path ) ) {
+                
+                // Check if constants are already defined
+                if ( ! defined( 'OWA_DTD_BIGINT' ) ) {
+                    
+                    if ( ! require_once( $connection_class_path ) ) {
+                         
+                         owa_coreAPI::error(sprintf('Cannot locate proper db class at %s.', $connection_class_path));
+                         
+                         return false;
+                    }
+                }
+                
+            } else {
 				
-				if ( file_exists( $connection_class_path ) ) {
-					
-	                 if ( ! require_once( $connection_class_path ) ) {
-	                     
-	                     owa_coreAPI::error(sprintf('Cannot locate proper db class at %s.', $connection_class_path));
-	                     
-	                     return false;
-	                }
-	                
-				} else {
-					
-					owa_coreAPI::error("$type database connection class file not found.");
-				}
+				owa_coreAPI::error("$type database connection class file not found.");
+				return false;
 			}
 
         } else {
 	        
 	        owa_coreAPI::error("$type is not a supported database.");
+	        return false;
         }
 
          return true;
@@ -104,25 +108,60 @@ class owa_coreAPI {
 
     public static function dbFactory() {
 
-        $db_type = owa_coreAPI::getSetting('base', 'db_type');
+        // Use config file constants first (for initial load before DB settings are available)
+        // Fall back to settings if constants are not defined
+        $db_type = defined('OWA_DB_TYPE') ? OWA_DB_TYPE : owa_coreAPI::getSetting('base', 'db_type');
+        
+        // If no database type is configured, return null (e.g., during installation)
+        if (!$db_type) {
+            owa_coreAPI::debug('Database type not configured. Database connection unavailable.');
+            return null;
+        }
+        
         $ret = owa_coreAPI::setupStorageEngine($db_type);
 
          if (!$ret) {
              owa_coreAPI::error(sprintf('Failed to initialize db type %s. Exiting.', $db_type));
-             return;
+             return null;
         } else {
             $connection_class = 'owa_db_'.$db_type;
-            $db = new $connection_class(
-                owa_coreAPI::getSetting('base','db_host'),
-                owa_coreAPI::getSetting('base','db_port'),
-                owa_coreAPI::getSetting('base','db_name'),
-                owa_coreAPI::getSetting('base','db_user'),
-                owa_coreAPI::getSetting('base','db_password'),
-                owa_coreAPI::getSetting('base','db_force_new_connections'),
-                owa_coreAPI::getSetting('base','db_make_persistant_connections')
-            );
+            
+            // Use constants from config file if available, otherwise use settings
+            $db_host = defined('OWA_DB_HOST') ? OWA_DB_HOST : owa_coreAPI::getSetting('base','db_host');
+            $db_port = defined('OWA_DB_PORT') ? OWA_DB_PORT : owa_coreAPI::getSetting('base','db_port');
+            $db_name = defined('OWA_DB_NAME') ? OWA_DB_NAME : owa_coreAPI::getSetting('base','db_name');
+            $db_user = defined('OWA_DB_USER') ? OWA_DB_USER : owa_coreAPI::getSetting('base','db_user');
+            $db_password = defined('OWA_DB_PASSWORD') ? OWA_DB_PASSWORD : owa_coreAPI::getSetting('base','db_password');
+            $db_force_new = owa_coreAPI::getSetting('base','db_force_new_connections');
+            $db_persistent = owa_coreAPI::getSetting('base','db_make_persistant_connections');
+            
+            // Validate required connection parameters
+            if (empty($db_host) || empty($db_name) || empty($db_user)) {
+                owa_coreAPI::debug('Database connection parameters incomplete. Cannot establish connection.');
+                return null;
+            }
+            
+            // Default port if not specified
+            if (empty($db_port)) {
+                $db_port = '3306';
+            }
+            
+            try {
+                $db = new $connection_class(
+                    $db_host,
+                    $db_port,
+                    $db_name,
+                    $db_user,
+                    $db_password,
+                    $db_force_new,
+                    $db_persistent
+                );
 
-            return $db;
+                return $db;
+            } catch (Exception $e) {
+                owa_coreAPI::error(sprintf('Failed to create database connection: %s', $e->getMessage()));
+                return null;
+            }
         }
     }
 
@@ -134,6 +173,13 @@ class owa_coreAPI {
         static $config;
 
         if( ! isset( $config ) ) {
+
+            // Ensure database constants are loaded before creating settings
+            // This must happen before owa_settings constructor which creates entities
+            if (!defined('OWA_DTD_INT') || !defined('OWA_DTD_BIGINT')) {
+                $db_type = defined('OWA_DB_TYPE') ? OWA_DB_TYPE : 'mysql';
+                owa_coreAPI::setupStorageEngine($db_type);
+            }
 
             if ( ! class_exists( 'owa_settings' ) ) {
                 require_once( OWA_BASE_CLASS_DIR.'settings.php' );
@@ -502,12 +548,12 @@ class owa_coreAPI {
 
         // Must be called before any entities are created
 
-        if (!defined('OWA_DTD_INT')) {
+        if (!defined('OWA_DTD_INT') || !defined('OWA_DTD_BIGINT')) {
             if (defined('OWA_DB_TYPE')) {
                 owa_coreAPI::setupStorageEngine(OWA_DB_TYPE);
             } else {
-                //owa_coreAPI::setupStorageEngine('mysql');
-                self::error("OWA_DB_TYPE constant has not been set for some reason.");
+                // Default to mysql if DB_TYPE is not defined (e.g., during installation)
+                owa_coreAPI::setupStorageEngine('mysql');
             }
 
         }

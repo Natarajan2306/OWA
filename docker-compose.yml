@@ -1,0 +1,48 @@
+services:
+  web:
+    build: .
+    container_name: owa-web
+    ports:
+      - "8080:80"
+    volumes:
+      - ./owa-config.php:/var/www/html/owa-config.php
+      - ./owa-data:/var/www/html/owa-data
+      - .:/var/www/html
+    depends_on:
+      - db
+    environment:
+      - OWA_DB_HOST=db
+      - OWA_DB_NAME=owa
+      - OWA_DB_USER=owa_user
+      - OWA_DB_PASSWORD=owa_password
+      - OWA_DB_PORT=3306
+    networks:
+      - owa-network
+
+  db:
+    image: mysql:8.0
+    container_name: owa-db
+    restart: always
+    environment:
+      MYSQL_DATABASE: owa
+      MYSQL_USER: owa_user
+      MYSQL_PASSWORD: owa_password
+      MYSQL_ROOT_PASSWORD: root_password
+    volumes:
+      - owa-db-data:/var/lib/mysql
+    ports:
+      - "3307:3306"
+    networks:
+      - owa-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+volumes:
+  owa-db-data:
+
+networks:
+  owa-network:
+    driver: bridge
+

@@ -50,4 +50,13 @@ if ( file_exists( OWA_VENDOR_DIR . 'autoload.php' ) ) {
 	require_once ( OWA_VENDOR_DIR . 'autoload.php' );
 }
 
+// Suppress deprecation warnings from vendor libraries (PHP 8.1+ compatibility)
+// These are in third-party code and will be fixed in future library updates
+if (PHP_VERSION_ID >= 80100) {
+    // Temporarily suppress E_DEPRECATED to avoid warnings from vendor code
+    // OWA's error handler will be set up later and will handle other errors
+    $current_error_reporting = error_reporting();
+    error_reporting($current_error_reporting & ~E_DEPRECATED);
+}
+
 ?>

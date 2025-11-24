@@ -470,6 +470,13 @@ class owa_entity {
         } else {
         
             $db = owa_coreAPI::dbSingleton();
+            
+            // Check if database connection is available
+            if (!$db) {
+                owa_coreAPI::debug('Database connection not available. Cannot load entity from database.');
+                return;
+            }
+            
             $db->selectFrom($this->getTableName());
             $db->selectColumn('*');
             owa_coreAPI::debug("Col: $col, value: $value");

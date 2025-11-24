@@ -68,6 +68,12 @@
         // to coreAPI methods and entities. 
         $this->loadConfigFile();
         
+        // Setup storage engine before creating entities (needed for database constants)
+        if (!defined('OWA_DTD_INT') || !defined('OWA_DTD_BIGINT')) {
+            $db_type = defined('OWA_DB_TYPE') ? OWA_DB_TYPE : 'mysql';
+            owa_coreAPI::setupStorageEngine($db_type);
+        }
+        
         // create configuration object
         $this->config = owa_coreAPI::entityFactory('base.configuration');
         // load entity with the default settings
@@ -266,8 +272,22 @@
 
         $this->config_id = $id;
 
+        // Check if database connection is available before trying to load
+        $db = owa_coreAPI::dbSingleton();
+        if (!$db) {
+            owa_coreAPI::debug('Database connection not available. Skipping load from database.');
+            return;
+        }
+
         $db_config = owa_coreAPI::entityFactory('base.configuration');
         $db_config->getByPk('id', $id);
+        
+        // Check if entity was loaded successfully
+        if (!$db_config->wasPersisted()) {
+            owa_coreAPI::debug('Configuration not found in database. Using default settings.');
+            return;
+        }
+        
         $db_settings = unserialize($db_config->get('settings'));
 
         //print $db_settings;

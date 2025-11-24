@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Tracking - Practical DevSecOps</title>
+    
+    <!-- Start Open Web Analytics Tracker -->
+    <script type="text/javascript">
+    //<![CDATA[
+    var owa_baseUrl = 'http://localhost:8000/';
+    var owa_cmds = owa_cmds || [];
+    owa_cmds.push(['setSiteId', 'c1597ea04ab6dfca2312ff36ed06ade5']);
+    
+    (function() {
+        var _owa = document.createElement('script'); _owa.type = 'text/javascript'; _owa.async = true;
+        owa_baseUrl = ('https:' == document.location.protocol ? window.owa_baseSecUrl || owa_baseUrl.replace(/http:/, 'https:') : owa_baseUrl );
+        _owa.src = owa_baseUrl + 'modules/base/dist/owa.tracker.js';
+        var _owa_s = document.getElementsByTagName('script')[0]; _owa_s.parentNode.insertBefore(_owa, _owa_s);
+    }());
+    //]]>
+    </script>
+    <!-- End Open Web Analytics Code -->
+</head>
+<body>
+    <h1>Test Tracking Page</h1>
+    <p>This is a test page to verify OWA tracking is working.</p>
+    <p>Open this file in your browser to send a tracking event to OWA.</p>
+    <p>Then check your OWA dashboard to see if the visit was recorded.</p>
+    
+    <p><strong>Site ID:</strong> c1597ea04ab6dfca2312ff36ed06ade5</p>
+    <p><strong>Domain:</strong> https://www.practical-devsecops.com</p>
+</body>
+</html>
+
+
+
+

@@ -16,6 +16,34 @@
 // $Id$
 //
 
+// Prevent redirect loops - reject URLs that are too long or contain nested loginForm redirects
+// This must run BEFORE any other code to catch the issue early
+if (isset($_SERVER['REQUEST_URI'])) {
+    $request_uri = $_SERVER['REQUEST_URI'];
+    // Check for nested loginForm redirects in owa_go parameter (check first as it's more specific)
+    if (preg_match('/owa_go=.*base\.loginForm.*owa_go=.*base\.loginForm/i', $request_uri) ||
+        preg_match('/go=.*base\.loginForm.*go=.*base\.loginForm/i', $request_uri)) {
+        // Redirect to clean loginForm URL
+        header('Location: /index.php?owa_do=base.loginForm', true, 302);
+        exit;
+    }
+    // Reject URLs longer than 2000 characters (Apache default is 8190, but we want to catch loops early)
+    if (strlen($request_uri) > 2000) {
+        // Redirect to clean loginForm URL
+        header('Location: /index.php?owa_do=base.loginForm', true, 302);
+        exit;
+    }
+    // Also check query string for nested redirects
+    if (isset($_SERVER['QUERY_STRING'])) {
+        $query_string = $_SERVER['QUERY_STRING'];
+        if (preg_match('/owa_go=.*base\.loginForm.*owa_go=.*base\.loginForm/i', $query_string) ||
+            preg_match('/go=.*base\.loginForm.*go=.*base\.loginForm/i', $query_string)) {
+            header('Location: /index.php?owa_do=base.loginForm', true, 302);
+            exit;
+        }
+    }
+}
+
 require_once('owa_env.php');
 require_once(OWA_DIR.'owa.php');
 

@@ -99,18 +99,55 @@ class owa_installConfigController extends owa_installController {
             define('OWA_DB_PASSWORD', $this->getParam( 'db_password' ) );
         }
 
+        // Validate database parameters before setting them
+        $db_host = trim(OWA_DB_HOST);
+        $db_user = trim(OWA_DB_USER);
+        $db_name = trim(OWA_DB_NAME);
+        $db_port = trim(OWA_DB_PORT);
+        
+        // Check for invalid parameters (like "Warning" which indicates a PHP warning was captured)
+        if (empty($db_host) || stripos($db_host, 'warning') !== false || 
+            empty($db_user) || stripos($db_user, 'warning') !== false ||
+            empty($db_name) || stripos($db_name, 'warning') !== false) {
+            $this->set('error_msg', 'Invalid database connection parameters. Please check that all fields are filled correctly.');
+            $this->set('config', $this->params);
+            $this->setView('base.install');
+            $this->setSubview('base.installConfigEntry');
+            return;
+        }
+        
         owa_coreAPI::setSetting('base', 'db_type', OWA_DB_TYPE);
-        owa_coreAPI::setSetting('base', 'db_host', OWA_DB_HOST);
-        owa_coreAPI::setSetting('base', 'db_port', OWA_DB_PORT);
-        owa_coreAPI::setSetting('base', 'db_name', OWA_DB_NAME);
-        owa_coreAPI::setSetting('base', 'db_user', OWA_DB_USER);
+        owa_coreAPI::setSetting('base', 'db_host', $db_host);
+        owa_coreAPI::setSetting('base', 'db_port', $db_port ?: '3306');
+        owa_coreAPI::setSetting('base', 'db_name', $db_name);
+        owa_coreAPI::setSetting('base', 'db_user', $db_user);
         owa_coreAPI::setSetting('base', 'db_password', OWA_DB_PASSWORD);
 
         // Check DB connection status
         $db = owa_coreAPI::dbSingleton();
         $db->connect();
         if ($db->connection_status != true) {
-            $this->set('error_msg', $this->getMsg(3012));
+            // Get the actual error message from the database connection
+            $error_detail = '';
+            if (method_exists($db, 'getLastError')) {
+                $error_detail = $db->getLastError();
+            }
+            $error_msg_array = $this->getMsg(3012);
+            $error_msg = is_array($error_msg_array) ? $error_msg_array['message'] : (string)$error_msg_array;
+            if ($error_detail) {
+                $error_msg = $error_msg . '<br><strong>MySQL Error:</strong> ' . htmlspecialchars($error_detail);
+                // Provide helpful suggestions based on the error
+                if (stripos($error_detail, 'Access denied') !== false) {
+                    $error_msg .= '<br><br><strong>Possible solutions:</strong><ul>';
+                    $error_msg .= '<li>Check that your database username and password are correct</li>';
+                    $error_msg .= '<li>If using root user, make sure you have the correct password</li>';
+                    $error_msg .= '<li>Consider creating a dedicated MySQL user for OWA (see instructions below)</li>';
+                    $error_msg .= '</ul>';
+                } elseif (stripos($error_detail, 'Unknown database') !== false) {
+                    $error_msg .= '<br><br><strong>Solution:</strong> The database does not exist. Please create it first using: <code>CREATE DATABASE ' . htmlspecialchars($db_name) . ';</code>';
+                }
+            }
+            $this->set('error_msg', $error_msg);
             $this->set('config', $this->params);
             $this->setView('base.install');
             $this->setSubview('base.installConfigEntry');

@@ -34,21 +34,34 @@ class owa_loginController extends owa_controller {
         // if authentication is successfull
         if ($status['auth_status'] == true) {
 
+            // Force redirect to index.php (not install.php) after successful login
+            $public_url = owa_coreAPI::getSetting('base', 'public_url');
+            $start_page = $this->config['start_page'];
+            
             if (!empty($go)) {
-                // redirect to url if present
+                // redirect to url if present, but ensure it's index.php
                 $url = urldecode(htmlspecialchars_decode( $go ) );
+                // If URL contains install.php, replace with index.php
+                if (strpos($url, 'install.php') !== false) {
+                    $url = str_replace('install.php', 'index.php', $url);
+                }
+                // If URL doesn't start with http, prepend public_url
+                if (!preg_match('/^https?:\/\//', $url)) {
+                    if (strpos($url, '/') !== 0) {
+                        $url = $public_url . $url;
+                    } else {
+                        $url = $public_url . ltrim($url, '/');
+                    }
+                }
                 $this->e->debug("redirecting browser to...:". $url);
                 owa_lib::redirectBrowser($url);
 
             } else {
-                //else redirect to home page
-
-                // these need to be unset as they were set previously by the doAction method.
-                // need to refactor this out.
-                $this->set('auth_status', '');
-                $this->set('params', '');
-                $this->set('site_id', '');
-                $this->setRedirectAction($this->config['start_page']);
+                //else redirect to home page - always use index.php
+                $redirect_url = $public_url . 'index.php?owa_do=' . $start_page;
+                $this->e->debug("redirecting browser to start page: ". $redirect_url);
+                owa_lib::redirectBrowser($redirect_url);
+                exit; // Ensure we exit after redirect
             }
 
         } else {
