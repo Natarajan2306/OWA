@@ -104,12 +104,21 @@
       */
      public function isConfigFilePresent() {
 
-        $file = $this->get('base', 'config_file');
+        // Check for config file in the standard location
+        $file = OWA_DIR.'owa-config.php';
         
         if ( file_exists( $file ) ) {
             
             return true;
         }
+        
+        // Fallback: check if config_file setting is set
+        $config_file = $this->get('base', 'config_file');
+        if ($config_file && file_exists($config_file)) {
+            return true;
+        }
+        
+        return false;
      }
      
      public function isConfigFileLoaded() {
@@ -119,13 +128,19 @@
 
      private function loadConfigFile() {
  
-        //$file = $this->get('base', 'config_file');
         $file = OWA_DIR.'owa-config.php';
         
-        if ( $this->isConfigFilePresent() ) {
+        if ( file_exists( $file ) ) {
             
             include_once($file);
             $this->config_file_loaded = true;
+        } else {
+            // Fallback: try config_file setting
+            $config_file = $this->get('base', 'config_file');
+            if ($config_file && file_exists($config_file)) {
+                include_once($config_file);
+                $this->config_file_loaded = true;
+            }
         }
      }
 
