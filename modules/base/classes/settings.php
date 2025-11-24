@@ -130,6 +130,11 @@
  
         $file = OWA_DIR.'owa-config.php';
         
+        // Suppress all warnings/errors when config file doesn't exist (normal during installation)
+        $old_error_reporting = error_reporting(0);
+        $old_display_errors = ini_get('display_errors');
+        @ini_set('display_errors', 0);
+        
         if ( file_exists( $file ) && is_readable( $file ) ) {
             
             @include_once($file);
@@ -145,6 +150,12 @@
                 // Don't throw warnings, just mark as not loaded
                 $this->config_file_loaded = false;
             }
+        }
+        
+        // Restore error reporting
+        error_reporting($old_error_reporting);
+        if ($old_display_errors !== false) {
+            @ini_set('display_errors', $old_display_errors);
         }
      }
 

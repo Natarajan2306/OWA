@@ -112,16 +112,40 @@ try {
 }
 
 // Check if config file exists before loading OWA
-if (!file_exists(OWA_DIR.'owa-config.php')) {
-    // Config file doesn't exist, redirect to install
-    if (ob_get_level()) {
-        ob_end_clean();
+$config_file = OWA_DIR.'owa-config.php';
+if (!file_exists($config_file)) {
+    // Try to create it from template if it doesn't exist
+    $config_dist = OWA_DIR.'owa-config-dist.php';
+    if (file_exists($config_dist) && is_readable($config_dist)) {
+        // Suppress errors during copy
+        $old_error_reporting = error_reporting(0);
+        @copy($config_dist, $config_file);
+        @chmod($config_file, 0644);
+        error_reporting($old_error_reporting);
+        
+        // Check again if it was created
+        if (!file_exists($config_file)) {
+            // Still doesn't exist, redirect to install
+            if (ob_get_level()) {
+                ob_end_clean();
+            }
+            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
+            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $public_url = $protocol . $host . '/';
+            header('Location: ' . $public_url . 'install.php', true, 302);
+            exit;
+        }
+    } else {
+        // Template doesn't exist, redirect to install
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
+        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $public_url = $protocol . $host . '/';
+        header('Location: ' . $public_url . 'install.php', true, 302);
+        exit;
     }
-    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
-    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-    $public_url = $protocol . $host . '/';
-    header('Location: ' . $public_url . 'install.php', true, 302);
-    exit;
 }
 
 try {

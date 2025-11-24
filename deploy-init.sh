@@ -12,9 +12,20 @@ if [ ! -f "$CONFIG_FILE" ]; then
     echo "Config file not found. Creating from template..."
     if [ -f "$CONFIG_DIST" ]; then
         cp "$CONFIG_DIST" "$CONFIG_FILE"
-        echo "Config file created from template."
+        echo "Config file created from template at $CONFIG_FILE"
+        
+        # Verify the file was created
+        if [ -f "$CONFIG_FILE" ]; then
+            echo "Config file verified: exists and readable"
+            ls -la "$CONFIG_FILE"
+        else
+            echo "ERROR: Config file was not created successfully!"
+            exit 1
+        fi
     else
         echo "Warning: Config template not found at $CONFIG_DIST"
+        echo "Listing files in /var/www/html:"
+        ls -la /var/www/html/ | grep -E "config|owa" || true
     fi
 fi
 
@@ -23,6 +34,10 @@ if [ -f "$CONFIG_FILE" ]; then
     chmod 644 "$CONFIG_FILE"
     chown www-data:www-data "$CONFIG_FILE" 2>/dev/null || true
     echo "Config file permissions set."
+    echo "Final config file status:"
+    ls -la "$CONFIG_FILE"
+else
+    echo "WARNING: Config file still does not exist after creation attempt!"
 fi
 
 # Ensure owa-data directory exists and is writable
