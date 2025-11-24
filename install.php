@@ -1,5 +1,22 @@
 <?php
 // Set up error handling FIRST, before anything else
+// Start output buffering immediately to catch any warnings
+if (!ob_get_level()) {
+    ob_start();
+}
+
+// Set up custom error handler to suppress config file warnings
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    // Suppress warnings about missing config file (normal during installation)
+    if (($errno === E_WARNING || $errno === E_NOTICE) && 
+        (strpos($errstr, 'owa-config.php') !== false || 
+         strpos($errstr, 'Failed to open stream') !== false ||
+         strpos($errstr, 'Failed opening') !== false)) {
+        return true; // Suppress this error
+    }
+    return false; // Let other errors through to default handler
+}, E_WARNING | E_NOTICE);
+
 error_reporting(E_ALL);
 
 // Try to enable error display (may be overridden by php.ini in production)

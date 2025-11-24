@@ -130,29 +130,52 @@
  
         $file = OWA_DIR.'owa-config.php';
         
-        // Use output buffering to completely suppress any warnings
-        ob_start();
+        // Set up custom error handler to completely suppress warnings about config file
+        $old_error_handler = set_error_handler(function($errno, $errstr, $errfile, $errline) use ($file) {
+            // Suppress ALL warnings/errors related to config file, regardless of source file
+            if (($errno === E_WARNING || $errno === E_NOTICE) && 
+                (strpos($errstr, 'owa-config.php') !== false || 
+                 strpos($errstr, 'Failed to open stream') !== false ||
+                 strpos($errstr, 'Failed opening') !== false ||
+                 strpos($errstr, $file) !== false)) {
+                return true; // Suppress this error completely
+            }
+            return false; // Let other errors through
+        }, E_WARNING | E_NOTICE | E_USER_WARNING | E_USER_NOTICE);
         
-        // Suppress all warnings/errors when config file doesn't exist (normal during installation)
+        // Use output buffering to catch any warnings that slip through
+        $ob_started = false;
+        if (!ob_get_level()) {
+            ob_start();
+            $ob_started = true;
+        }
+        
+        // Completely disable error reporting and display for this operation
         $old_error_reporting = error_reporting(0);
         $old_display_errors = ini_get('display_errors');
+        $old_display_startup_errors = ini_get('display_startup_errors');
         @ini_set('display_errors', 0);
+        @ini_set('display_startup_errors', 0);
         
         // Check if file exists and is actually readable (not just a broken symlink)
+        // Use @ to suppress any warnings from file operations
         $file_exists = false;
         $file_readable = false;
         
-        if (file_exists($file)) {
-            $file_exists = true;
+        // Try to check file existence without triggering warnings
+        $file_exists = @file_exists($file);
+        
+        if ($file_exists) {
             // Double check it's actually a file and readable
-            if (is_file($file) && is_readable($file)) {
-                $file_readable = true;
-            }
+            $file_readable = @is_file($file) && @is_readable($file);
         }
         
+        // Only try to include if file definitely exists and is readable
         if ($file_exists && $file_readable) {
             // File exists and is readable, try to include it
+            // Use @include_once to suppress any remaining warnings
             $included = @include_once($file);
+            // include_once returns 1 on success, false on failure, or the return value of the included file
             if ($included !== false) {
                 $this->config_file_loaded = true;
             } else {
@@ -161,7 +184,7 @@
         } else {
             // File doesn't exist or isn't readable - try fallback
             $config_file = $this->get('base', 'config_file');
-            if ($config_file && file_exists($config_file) && is_file($config_file) && is_readable($config_file)) {
+            if ($config_file && @file_exists($config_file) && @is_file($config_file) && @is_readable($config_file)) {
                 $included = @include_once($config_file);
                 if ($included !== false) {
                     $this->config_file_loaded = true;
@@ -176,12 +199,24 @@
         }
         
         // Discard any output (warnings) that were buffered
-        ob_end_clean();
+        if ($ob_started && ob_get_level()) {
+            ob_end_clean();
+        }
         
-        // Restore error reporting
+        // Restore error handler
+        if ($old_error_handler !== null) {
+            set_error_handler($old_error_handler);
+        } else {
+            restore_error_handler();
+        }
+        
+        // Restore error reporting and display settings
         error_reporting($old_error_reporting);
         if ($old_display_errors !== false) {
             @ini_set('display_errors', $old_display_errors);
+        }
+        if ($old_display_startup_errors !== false) {
+            @ini_set('display_startup_errors', $old_display_startup_errors);
         }
      }
 
