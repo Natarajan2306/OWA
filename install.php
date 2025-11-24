@@ -1,4 +1,33 @@
 <?php
+// Set up error handling FIRST, before anything else
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+ini_set('error_log', '/var/log/apache2/php_errors.log');
+
+// Register error handler to catch fatal errors
+register_shutdown_function(function() {
+    $error = error_get_last();
+    if ($error !== NULL && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        // Only show error page if headers haven't been sent
+        if (!headers_sent()) {
+            while (ob_get_level()) {
+                ob_end_clean();
+            }
+            http_response_code(500);
+            header('Content-Type: text/html; charset=utf-8');
+            echo '<!DOCTYPE html><html><head><title>Fatal Error</title></head><body>';
+            echo '<h1>Fatal Error</h1>';
+            echo '<p><strong>Message:</strong> ' . htmlspecialchars($error['message']) . '</p>';
+            echo '<p><strong>File:</strong> ' . htmlspecialchars($error['file']) . ':' . $error['line'] . '</p>';
+            echo '<p><strong>Type:</strong> ' . $error['type'] . '</p>';
+            echo '</body></html>';
+        }
+    }
+});
+
+// Use output buffering to catch any warnings that might be output
+ob_start();
 
 //
 // Open Web Analytics - An Open Source Web Analytics Framework
@@ -16,16 +45,33 @@
 // $Id$
 //
 
-// Suppress warnings during installation when config file doesn't exist yet
-// Use output buffering to catch any warnings that might be output
-ob_start();
-error_reporting(E_ALL);
-ini_set('display_errors', 0);
-ini_set('log_errors', 1);
-ini_set('error_log', '/var/log/apache2/php_errors.log');
+try {
+    include_once('owa_env.php');
+} catch (Throwable $e) {
+    ob_clean();
+    http_response_code(500);
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<!DOCTYPE html><html><head><title>Error Loading OWA Environment</title></head><body>';
+    echo '<h1>Error Loading OWA Environment</h1>';
+    echo '<p>' . htmlspecialchars($e->getMessage()) . '</p>';
+    echo '<p><strong>File:</strong> ' . htmlspecialchars($e->getFile()) . ':' . $e->getLine() . '</p>';
+    echo '</body></html>';
+    exit;
+}
 
-include_once('owa_env.php');
-require_once(OWA_BASE_DIR.'/owa.php');
+try {
+    require_once(OWA_BASE_DIR.'/owa.php');
+} catch (Throwable $e) {
+    ob_clean();
+    http_response_code(500);
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<!DOCTYPE html><html><head><title>Error Loading OWA</title></head><body>';
+    echo '<h1>Error Loading OWA</h1>';
+    echo '<p>' . htmlspecialchars($e->getMessage()) . '</p>';
+    echo '<p><strong>File:</strong> ' . htmlspecialchars($e->getFile()) . ':' . $e->getLine() . '</p>';
+    echo '</body></html>';
+    exit;
+}
 
 /**
  * Install Page Wrapper Script
