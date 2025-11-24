@@ -5,7 +5,6 @@ services:
     ports:
       - "8081:80"
     volumes:
-      - ./owa-config.php:/var/www/html/owa-config.php
       - ./owa-data:/var/www/html/owa-data
       - .:/var/www/html
     depends_on:
