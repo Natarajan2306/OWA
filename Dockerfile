@@ -46,6 +46,13 @@ COPY apache-config.conf /etc/apache2/sites-available/000-default.conf
 # Copy application files
 COPY . .
 
+# Create config file from template if it doesn't exist (during build)
+# This ensures the file exists even if the volume mount overwrites it
+RUN if [ ! -f /var/www/html/owa-config.php ] && [ -f /var/www/html/owa-config-dist.php ]; then \
+        cp /var/www/html/owa-config-dist.php /var/www/html/owa-config.php && \
+        chmod 644 /var/www/html/owa-config.php; \
+    fi
+
 # Copy deployment initialization script
 COPY deploy-init.sh /usr/local/bin/deploy-init.sh
 RUN chmod +x /usr/local/bin/deploy-init.sh
