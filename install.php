@@ -1,7 +1,9 @@
 <?php
 // Set up error handling FIRST, before anything else
 error_reporting(E_ALL);
-ini_set('display_errors', 0);
+// Temporarily enable error display for debugging - change to 0 in production
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
 ini_set('log_errors', 1);
 ini_set('error_log', '/var/log/apache2/php_errors.log');
 
@@ -48,13 +50,33 @@ ob_start();
 try {
     include_once('owa_env.php');
 } catch (Throwable $e) {
-    ob_clean();
-    http_response_code(500);
-    header('Content-Type: text/html; charset=utf-8');
+    if (ob_get_level()) {
+        ob_clean();
+    }
+    if (!headers_sent()) {
+        http_response_code(500);
+        header('Content-Type: text/html; charset=utf-8');
+    }
     echo '<!DOCTYPE html><html><head><title>Error Loading OWA Environment</title></head><body>';
     echo '<h1>Error Loading OWA Environment</h1>';
     echo '<p>' . htmlspecialchars($e->getMessage()) . '</p>';
     echo '<p><strong>File:</strong> ' . htmlspecialchars($e->getFile()) . ':' . $e->getLine() . '</p>';
+    echo '<pre>' . htmlspecialchars($e->getTraceAsString()) . '</pre>';
+    echo '</body></html>';
+    exit;
+}
+
+if (!defined('OWA_BASE_DIR')) {
+    if (ob_get_level()) {
+        ob_clean();
+    }
+    if (!headers_sent()) {
+        http_response_code(500);
+        header('Content-Type: text/html; charset=utf-8');
+    }
+    echo '<!DOCTYPE html><html><head><title>Configuration Error</title></head><body>';
+    echo '<h1>Configuration Error</h1>';
+    echo '<p>OWA_BASE_DIR is not defined after loading owa_env.php</p>';
     echo '</body></html>';
     exit;
 }
@@ -62,13 +84,18 @@ try {
 try {
     require_once(OWA_BASE_DIR.'/owa.php');
 } catch (Throwable $e) {
-    ob_clean();
-    http_response_code(500);
-    header('Content-Type: text/html; charset=utf-8');
+    if (ob_get_level()) {
+        ob_clean();
+    }
+    if (!headers_sent()) {
+        http_response_code(500);
+        header('Content-Type: text/html; charset=utf-8');
+    }
     echo '<!DOCTYPE html><html><head><title>Error Loading OWA</title></head><body>';
     echo '<h1>Error Loading OWA</h1>';
     echo '<p>' . htmlspecialchars($e->getMessage()) . '</p>';
     echo '<p><strong>File:</strong> ' . htmlspecialchars($e->getFile()) . ':' . $e->getLine() . '</p>';
+    echo '<pre>' . htmlspecialchars($e->getTraceAsString()) . '</pre>';
     echo '</body></html>';
     exit;
 }
@@ -133,15 +160,20 @@ try {
     }
 } catch (Throwable $e) {
     // Clear output buffer
-    $output = ob_get_clean();
+    $output = '';
+    if (ob_get_level()) {
+        $output = ob_get_clean();
+    }
     
     // Log the error
     error_log(sprintf('OWA Installation Error: %s in %s:%d', $e->getMessage(), $e->getFile(), $e->getLine()));
     error_log('Stack trace: ' . $e->getTraceAsString());
     
     // Display a friendly error page
-    http_response_code(500);
-    header('Content-Type: text/html; charset=utf-8');
+    if (!headers_sent()) {
+        http_response_code(500);
+        header('Content-Type: text/html; charset=utf-8');
+    }
     ?>
     <!DOCTYPE html>
     <html>
