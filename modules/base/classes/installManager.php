@@ -128,6 +128,10 @@ class owa_installManager extends owa_base {
 
         // Check DB connection status
         $db = owa_coreAPI::dbSingleton();
+        if (!$db) {
+            owa_coreAPI::debug('Database connection not available. Cannot check connection.');
+            return false;
+        }
         $db->connect();
         if ($db->connection_status === true) {
             return true;
@@ -147,6 +151,10 @@ class owa_installManager extends owa_base {
         
         // can DB connection be made?
         $db = owa_coreAPI::dbSingleton();
+        if (!$db) {
+            owa_coreAPI::debug('Database connection not available. Installation not complete.');
+            return false;
+        }
         if ( ! $db->connect() ) {
             
             return false;
@@ -162,7 +170,10 @@ class owa_installManager extends owa_base {
         }
         
         // load config from DB
-        $c->load( $this->c->get( 'base', 'configuration_id' ) );
+        $config_id = $c->get( 'base', 'configuration_id' );
+        if ($config_id) {
+            $c->load( $config_id );
+        }
         
         // is the install flag set
         if ( ! owa_coreAPI::getSetting('base', 'install_complete') ) {
@@ -184,6 +195,10 @@ class owa_installManager extends owa_base {
         $tables_missing = [];
         
         $db = owa_coreAPI::dbSingleton();
+        if (!$db) {
+            owa_coreAPI::debug('Database connection not available. Cannot check schema installation.');
+            return false;
+        }
        
         // test for base tables
         foreach ( $base_module_tables as $table ) {
