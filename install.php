@@ -1,11 +1,27 @@
 <?php
 // Set up error handling FIRST, before anything else
 error_reporting(E_ALL);
-// Temporarily enable error display for debugging - change to 0 in production
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-ini_set('log_errors', 1);
-ini_set('error_log', '/var/log/apache2/php_errors.log');
+
+// Try to enable error display (may be overridden by php.ini in production)
+@ini_set('display_errors', 1);
+@ini_set('display_startup_errors', 1);
+@ini_set('log_errors', 1);
+
+// Try multiple error log locations
+$error_logs = [
+    '/var/log/apache2/php_errors.log',
+    '/var/log/php_errors.log',
+    __DIR__ . '/owa-data/logs/php_errors.log',
+    sys_get_temp_dir() . '/php_errors.log'
+];
+
+foreach ($error_logs as $log_path) {
+    $log_dir = dirname($log_path);
+    if (is_dir($log_dir) && is_writable($log_dir)) {
+        @ini_set('error_log', $log_path);
+        break;
+    }
+}
 
 // Register error handler to catch fatal errors
 register_shutdown_function(function() {

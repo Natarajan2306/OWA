@@ -30,8 +30,14 @@ if [ ! -d "/var/www/html/owa-data" ]; then
     mkdir -p /var/www/html/owa-data
 fi
 
-chmod -R 755 /var/www/html/owa-data 2>/dev/null || true
+# Ensure log directories exist
+mkdir -p /var/www/html/owa-data/logs 2>/dev/null || true
+mkdir -p /var/www/html/owa-data/caches 2>/dev/null || true
+mkdir -p /var/log/apache2 2>/dev/null || true
+
+chmod -R 775 /var/www/html/owa-data 2>/dev/null || true
 chown -R www-data:www-data /var/www/html/owa-data 2>/dev/null || true
+chmod 777 /var/log/apache2 2>/dev/null || true
 
 echo "Deployment initialization complete."
 

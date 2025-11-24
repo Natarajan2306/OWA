@@ -16,11 +16,53 @@
 // $Id$
 //
 
-// Suppress warnings when config file doesn't exist (will redirect to install)
+// Set up error handling FIRST, before anything else
+error_reporting(E_ALL);
+
+// Try to enable error display (may be overridden by php.ini in production)
+@ini_set('display_errors', 1);
+@ini_set('display_startup_errors', 1);
+@ini_set('log_errors', 1);
+
+// Try multiple error log locations
+$error_logs = [
+    '/var/log/apache2/php_errors.log',
+    '/var/log/php_errors.log',
+    __DIR__ . '/owa-data/logs/php_errors.log',
+    sys_get_temp_dir() . '/php_errors.log'
+];
+
+foreach ($error_logs as $log_path) {
+    $log_dir = dirname($log_path);
+    if (is_dir($log_dir) && is_writable($log_dir)) {
+        @ini_set('error_log', $log_path);
+        break;
+    }
+}
+
+// Register error handler to catch fatal errors
+register_shutdown_function(function() {
+    $error = error_get_last();
+    if ($error !== NULL && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        // Only show error page if headers haven't been sent
+        if (!headers_sent()) {
+            while (ob_get_level()) {
+                ob_end_clean();
+            }
+            http_response_code(500);
+            header('Content-Type: text/html; charset=utf-8');
+            echo '<!DOCTYPE html><html><head><title>Fatal Error</title></head><body>';
+            echo '<h1>Fatal Error</h1>';
+            echo '<p><strong>Message:</strong> ' . htmlspecialchars($error['message']) . '</p>';
+            echo '<p><strong>File:</strong> ' . htmlspecialchars($error['file']) . ':' . $error['line'] . '</p>';
+            echo '<p><strong>Type:</strong> ' . $error['type'] . '</p>';
+            echo '</body></html>';
+        }
+    }
+});
+
 // Use output buffering to catch any warnings that might be output
 ob_start();
-error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE);
-ini_set('display_errors', 0);
 
 // Prevent redirect loops - reject URLs that are too long or contain nested loginForm redirects
 // This must run BEFORE any other code to catch the issue early
@@ -50,11 +92,31 @@ if (isset($_SERVER['REQUEST_URI'])) {
     }
 }
 
-require_once('owa_env.php');
+try {
+    require_once('owa_env.php');
+} catch (Throwable $e) {
+    if (ob_get_level()) {
+        ob_clean();
+    }
+    if (!headers_sent()) {
+        http_response_code(500);
+        header('Content-Type: text/html; charset=utf-8');
+    }
+    echo '<!DOCTYPE html><html><head><title>Error Loading OWA Environment</title></head><body>';
+    echo '<h1>Error Loading OWA Environment</h1>';
+    echo '<p>' . htmlspecialchars($e->getMessage()) . '</p>';
+    echo '<p><strong>File:</strong> ' . htmlspecialchars($e->getFile()) . ':' . $e->getLine() . '</p>';
+    echo '<pre>' . htmlspecialchars($e->getTraceAsString()) . '</pre>';
+    echo '</body></html>';
+    exit;
+}
 
 // Check if config file exists before loading OWA
 if (!file_exists(OWA_DIR.'owa-config.php')) {
     // Config file doesn't exist, redirect to install
+    if (ob_get_level()) {
+        ob_end_clean();
+    }
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
     $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
     $public_url = $protocol . $host . '/';
@@ -62,7 +124,24 @@ if (!file_exists(OWA_DIR.'owa-config.php')) {
     exit;
 }
 
-require_once(OWA_DIR.'owa.php');
+try {
+    require_once(OWA_DIR.'owa.php');
+} catch (Throwable $e) {
+    if (ob_get_level()) {
+        ob_clean();
+    }
+    if (!headers_sent()) {
+        http_response_code(500);
+        header('Content-Type: text/html; charset=utf-8');
+    }
+    echo '<!DOCTYPE html><html><head><title>Error Loading OWA</title></head><body>';
+    echo '<h1>Error Loading OWA</h1>';
+    echo '<p>' . htmlspecialchars($e->getMessage()) . '</p>';
+    echo '<p><strong>File:</strong> ' . htmlspecialchars($e->getFile()) . ':' . $e->getLine() . '</p>';
+    echo '<pre>' . htmlspecialchars($e->getTraceAsString()) . '</pre>';
+    echo '</body></html>';
+    exit;
+}
 
 /**
  * Main Admin Page Wrapper Script
@@ -83,13 +162,36 @@ $config = [
     'instance_role' => 'admin_web'
 ];
 
-$owa = new owa( $config );
+try {
+    $owa = new owa( $config );
+} catch (Throwable $e) {
+    if (ob_get_level()) {
+        ob_clean();
+    }
+    if (!headers_sent()) {
+        http_response_code(500);
+        header('Content-Type: text/html; charset=utf-8');
+    }
+    echo '<!DOCTYPE html><html><head><title>Error Initializing OWA</title></head><body>';
+    echo '<h1>Error Initializing OWA</h1>';
+    echo '<p>' . htmlspecialchars($e->getMessage()) . '</p>';
+    echo '<p><strong>File:</strong> ' . htmlspecialchars($e->getFile()) . ':' . $e->getLine() . '</p>';
+    echo '<pre>' . htmlspecialchars($e->getTraceAsString()) . '</pre>';
+    echo '</body></html>';
+    exit;
+}
 
 if (!$owa->isOwaInstalled()) {
     // Clear any output buffer before redirect
-    ob_end_clean();
+    if (ob_get_level()) {
+        ob_end_clean();
+    }
     // redirect to install
-    $public_url = owa_coreAPI::getSetting('base','public_url');
+    try {
+        $public_url = owa_coreAPI::getSetting('base','public_url');
+    } catch (Throwable $e) {
+        $public_url = null;
+    }
     if (!$public_url) {
         // Fallback if public_url is not set
         $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
@@ -101,7 +203,9 @@ if (!$owa->isOwaInstalled()) {
 }
 
 // Clear output buffer and continue
-ob_end_clean();
+if (ob_get_level()) {
+    ob_end_clean();
+}
 
 if ( $owa->isEndpointEnabled( basename( __FILE__ ) ) ) {
     
