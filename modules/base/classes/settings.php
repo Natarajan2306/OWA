@@ -65,8 +65,15 @@
         
         // include/load config file
         // This needs to happen as early as possible in order to make constants available
-        // to coreAPI methods and entities. 
-        $this->loadConfigFile();
+        // to coreAPI methods and entities.
+        // Only try to load if file exists (check first to avoid warnings)
+        $config_file = OWA_DIR.'owa-config.php';
+        if (@file_exists($config_file) && @is_file($config_file) && @is_readable($config_file)) {
+            $this->loadConfigFile();
+        } else {
+            // Config file doesn't exist - this is OK during installation
+            $this->config_file_loaded = false;
+        }
         
         // Setup storage engine before creating entities (needed for database constants)
         if (!defined('OWA_DTD_INT') || !defined('OWA_DTD_BIGINT')) {
@@ -130,77 +137,122 @@
  
         $file = OWA_DIR.'owa-config.php';
         
-        // Set up custom error handler to completely suppress warnings about config file
-        $old_error_handler = set_error_handler(function($errno, $errstr, $errfile, $errline) use ($file) {
-            // Suppress ALL warnings/errors related to config file, regardless of source file
-            if (($errno === E_WARNING || $errno === E_NOTICE) && 
-                (strpos($errstr, 'owa-config.php') !== false || 
-                 strpos($errstr, 'Failed to open stream') !== false ||
-                 strpos($errstr, 'Failed opening') !== false ||
-                 strpos($errstr, $file) !== false)) {
-                return true; // Suppress this error completely
-            }
-            return false; // Let other errors through
-        }, E_WARNING | E_NOTICE | E_USER_WARNING | E_USER_NOTICE);
-        
-        // Use output buffering to catch any warnings that slip through
+        // Completely suppress all output and errors for this operation
         $ob_started = false;
         if (!ob_get_level()) {
             ob_start();
             $ob_started = true;
         }
         
-        // Completely disable error reporting and display for this operation
+        // Save current error settings
         $old_error_reporting = error_reporting(0);
-        $old_display_errors = ini_get('display_errors');
-        $old_display_startup_errors = ini_get('display_startup_errors');
+        $old_display_errors = @ini_get('display_errors');
+        $old_display_startup_errors = @ini_get('display_startup_errors');
+        
+        // Completely disable error display
         @ini_set('display_errors', 0);
         @ini_set('display_startup_errors', 0);
         
-        // Check if file exists and is actually readable (not just a broken symlink)
-        // Use @ to suppress any warnings from file operations
+        // Set error handler to suppress ALL warnings
+        $old_error_handler = set_error_handler(function($errno, $errstr, $errfile, $errline) {
+            // Suppress ALL warnings and notices completely
+            if ($errno === E_WARNING || $errno === E_NOTICE || $errno === E_USER_WARNING || $errno === E_USER_NOTICE) {
+                return true; // Suppress completely
+            }
+            return false;
+        }, E_ALL);
+        
+        // Check if file exists using multiple methods to be absolutely sure
         $file_exists = false;
         $file_readable = false;
+        $can_read = false;
+        $file_size_ok = false;
         
-        // Try to check file existence without triggering warnings
+        // Method 1: file_exists
         $file_exists = @file_exists($file);
         
         if ($file_exists) {
-            // Double check it's actually a file and readable
+            // Method 2: is_file (not a directory) and is_readable
             $file_readable = @is_file($file) && @is_readable($file);
+            
+            if ($file_readable) {
+                // Method 3: Check file size (should be > 0)
+                $file_size = @filesize($file);
+                $file_size_ok = ($file_size !== false && $file_size > 0);
+                
+                if ($file_size_ok) {
+                    // Method 4: Try to actually read a byte to verify we can access it
+                    $handle = @fopen($file, 'r');
+                    if ($handle !== false) {
+                        $can_read = true;
+                        @fclose($handle);
+                    }
+                }
+            }
         }
         
-        // Only try to include if file definitely exists and is readable
-        if ($file_exists && $file_readable) {
-            // File exists and is readable, try to include it
-            // Use @include_once to suppress any remaining warnings
-            $included = @include_once($file);
-            // include_once returns 1 on success, false on failure, or the return value of the included file
-            if ($included !== false) {
-                $this->config_file_loaded = true;
+        // ONLY include if ALL checks pass AND we can actually read the file content
+        if ($file_exists && $file_readable && $file_size_ok && $can_read) {
+            // Final check: Try to read the file content to verify it's actually readable
+            $test_read = @file_get_contents($file, false, null, 0, 1);
+            if ($test_read !== false) {
+                // File is definitely readable, include it with try-catch
+                try {
+                    $included = @include_once($file);
+                    if ($included !== false) {
+                        $this->config_file_loaded = true;
+                    } else {
+                        $this->config_file_loaded = false;
+                    }
+                } catch (Throwable $e) {
+                    // If include throws an exception, mark as not loaded
+                    $this->config_file_loaded = false;
+                }
             } else {
+                // Can't read file content, don't try to include
                 $this->config_file_loaded = false;
             }
         } else {
-            // File doesn't exist or isn't readable - try fallback
+            // File doesn't exist or can't be read - try fallback
             $config_file = $this->get('base', 'config_file');
-            if ($config_file && @file_exists($config_file) && @is_file($config_file) && @is_readable($config_file)) {
-                $included = @include_once($config_file);
-                if ($included !== false) {
-                    $this->config_file_loaded = true;
+            if ($config_file) {
+                $fallback_exists = @file_exists($config_file);
+                $fallback_readable = false;
+                $fallback_can_read = false;
+                
+                if ($fallback_exists) {
+                    $fallback_readable = @is_file($config_file) && @is_readable($config_file);
+                    if ($fallback_readable) {
+                        $handle = @fopen($config_file, 'r');
+                        if ($handle !== false) {
+                            $fallback_can_read = true;
+                            @fclose($handle);
+                        }
+                    }
+                }
+                
+                if ($fallback_exists && $fallback_readable && $fallback_can_read) {
+                    $included = @include_once($config_file);
+                    if ($included !== false) {
+                        $this->config_file_loaded = true;
+                    } else {
+                        $this->config_file_loaded = false;
+                    }
                 } else {
                     $this->config_file_loaded = false;
                 }
             } else {
                 // Config file doesn't exist - this is OK during installation
-                // Don't throw warnings, just mark as not loaded
                 $this->config_file_loaded = false;
             }
         }
         
-        // Discard any output (warnings) that were buffered
+        // Discard ALL buffered output (including any warnings)
         if ($ob_started && ob_get_level()) {
             ob_end_clean();
+        } elseif (ob_get_level()) {
+            // If buffer was already started, just clean it
+            ob_clean();
         }
         
         // Restore error handler

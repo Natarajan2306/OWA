@@ -16,6 +16,19 @@
 // $Id$
 //
 
+// Set up error handler VERY EARLY to suppress config file warnings
+// This must happen before any classes are loaded
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    // Suppress warnings about missing config file (normal during installation)
+    if (($errno === E_WARNING || $errno === E_NOTICE) && 
+        (strpos($errstr, 'owa-config.php') !== false || 
+         strpos($errstr, 'Failed to open stream') !== false ||
+         strpos($errstr, 'Failed opening') !== false)) {
+        return true; // Suppress this error completely
+    }
+    return false; // Let other errors through
+}, E_WARNING | E_NOTICE);
+
 /**
  * Environment Configuration
  * 
