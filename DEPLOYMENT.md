@@ -2,6 +2,19 @@
 
 ## For Coolify Deployment
 
+### DNS Configuration
+
+**IMPORTANT**: Make sure your domain DNS is properly configured in Coolify:
+
+1. In Coolify, go to your application settings
+2. Configure the domain: `analytics.pdevsecops.com`
+3. Ensure DNS records are set up:
+   - A record pointing to your Coolify server IP, OR
+   - CNAME record pointing to your Coolify domain
+4. Wait for DNS propagation (can take a few minutes to hours)
+
+If you see `DNS_PROBE_FINISHED_NXDOMAIN`, it means DNS isn't configured yet. The application is working (as shown by the 302 redirect in logs), but the domain isn't resolving.
+
 ### 1. Environment Variables
 
 Set these environment variables in Coolify:

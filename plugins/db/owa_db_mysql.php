@@ -144,11 +144,15 @@ class owa_db_mysql extends owa_db {
 
             // Check if connection was successful before using it
             if ( ! $connect_result || mysqli_connect_error() ) {
-                $error_msg = mysqli_connect_error();
+                $error_msg = mysqli_connect_error() ? mysqli_connect_error() : 'Unknown connection error';
                 // Store the error for retrieval
                 $this->last_error = $error_msg;
                 $this->e->alert('Could not connect to database: ' . $error_msg);
                 $this->connection_status = false;
+                // Clean up the failed connection
+                if ($this->connection) {
+                    @mysqli_close($this->connection);
+                }
                 $this->connection = null;
                 return false;
             }
@@ -185,7 +189,7 @@ class owa_db_mysql extends owa_db {
      */
     function query( $sql ) {
   
-          if ( $this->connection_status == false) {
+          if ( $this->connection_status == false || !$this->connection) {
 
               owa_coreAPI::profile($this, __FUNCTION__, __LINE__);
 
@@ -205,6 +209,12 @@ class owa_db_mysql extends owa_db {
         if ( ! empty( $this->new_result ) ) {
 
             mysqli_free_result($this->new_result);
+        }
+
+        // Check if connection is available before executing query
+        if (!$this->connection) {
+            $this->e->alert('Database connection is not available in query(). Cannot execute: ' . $sql);
+            return false;
         }
 
         owa_coreAPI::profile($this, __FUNCTION__, __LINE__, $sql);
@@ -311,9 +321,17 @@ class owa_db_mysql extends owa_db {
             return $string;
         }
         $string = owa_sanitize::stripSql( $string );
-        if ($this->connection_status == false) {
+        if ($this->connection_status == false || !$this->connection) {
               $this->connect();
           }
+
+        // Check if connection is still null after attempting to connect
+        if (!$this->connection) {
+            $this->e->alert('Database connection is not available in prepare().');
+            // Return the string without escaping if connection is not available
+            // This is a fallback to prevent fatal errors
+            return addslashes($string);
+        }
 
         return mysqli_real_escape_string( $this->connection, $string );
 
