@@ -3,7 +3,7 @@ services:
     build: .
     container_name: owa-web
     ports:
-      - "8080:80"
+      - "8081:80"
     volumes:
       - ./owa-config.php:/var/www/html/owa-config.php
       - ./owa-data:/var/www/html/owa-data

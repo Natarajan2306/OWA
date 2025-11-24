@@ -30,7 +30,7 @@ This guide explains how to run Open Web Analytics using Docker.
    ```
 
 4. **Access the application**:
-   - Open your browser and navigate to `http://localhost:8080`
+   - Open your browser and navigate to `http://localhost:8081`
    - Follow the installation wizard
 
 ## Configuration
@@ -52,7 +52,7 @@ You can customize the database connection by modifying the environment variables
 
 ### Ports
 
-- `8080`: Web server port (mapped to container port 80)
+- `8081`: Web server port (mapped to container port 80)
 - `3307`: MySQL port (mapped to container port 3306, if you need direct database access)
 
 ## Building the Image
@@ -70,7 +70,7 @@ docker build -t open-web-analytics .
 ```bash
 docker run -d \
   --name owa-web \
-  -p 8080:80 \
+  -p 8081:80 \
   -v $(pwd)/owa-config.php:/var/www/html/owa-config.php \
   -v $(pwd)/owa-data:/var/www/html/owa-data \
   open-web-analytics
