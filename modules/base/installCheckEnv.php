@@ -116,7 +116,37 @@ class owa_installCheckEnvController extends owa_installController {
             if ($conn != true) {
                 $errors['db']['name'] = 'Database Connection';
                 $errors['db']['value'] = 'Connection failed';
-                $errors['db']['msg'] = 'Check the connection settings in your configuration file.' ;
+                
+                // Get detailed error message
+                $db = owa_coreAPI::dbSingleton();
+                $error_msg = 'Check the connection settings in your configuration file.';
+                if ($db && method_exists($db, 'getLastError')) {
+                    $error_detail = $db->getLastError();
+                    if ($error_detail) {
+                        $error_msg .= '<br><br><strong>Error Details:</strong> ' . htmlspecialchars($error_detail);
+                        
+                        // Provide helpful suggestions based on the error
+                        if (stripos($error_detail, 'Access denied') !== false) {
+                            $error_msg .= '<br><br><strong>Possible solutions:</strong><ul>';
+                            $error_msg .= '<li>Check that your database username and password are correct</li>';
+                            $error_msg .= '<li>Verify the database user has proper permissions</li>';
+                            $error_msg .= '</ul>';
+                        } elseif (stripos($error_detail, 'Unknown database') !== false) {
+                            $error_msg .= '<br><br><strong>Solution:</strong> The database does not exist. Please create it first.';
+                        } elseif (stripos($error_detail, 'getaddrinfo') !== false || stripos($error_detail, 'Name or service not known') !== false) {
+                            $error_msg .= '<br><br><strong>Solution:</strong> Cannot resolve database hostname. In Coolify, make sure:';
+                            $error_msg .= '<ul><li>The database service is linked to your application</li>';
+                            $error_msg .= '<li>The OWA_DB_HOST environment variable is set to the correct database service name</li>';
+                            $error_msg .= '<li>You can find the database service name in your Coolify database service settings</li></ul>';
+                        }
+                    }
+                } elseif (!$db) {
+                    $error_msg .= '<br><br><strong>Error:</strong> Database connection object could not be created.';
+                    $error_msg .= '<br>This usually means database connection parameters are missing or invalid in the config file.';
+                    $error_msg .= '<br>Please check that OWA_DB_HOST, OWA_DB_NAME, OWA_DB_USER, and OWA_DB_PASSWORD are set correctly.';
+                }
+                
+                $errors['db']['msg'] = $error_msg;
                 $bad_environment = true;
             }
         }

@@ -92,10 +92,18 @@ If you see "Failed to open stream" errors:
 
 **Most Common Issue in Coolify**: The database host is incorrect.
 
-1. **Check your database service name in Coolify**:
+1. **Find your database service name in Coolify**:
    - Go to your database service in Coolify
-   - Note the service name (e.g., `db-z4s0okcsgwco4wcssk8ogg8c-084342893874`)
-   - Set `OWA_DB_HOST` environment variable to this exact service name
+   - Look at the service name/container name (e.g., `db-z4s0okcsgwco4wcssk8ogg8c-093314688937`)
+   - This is visible in the database service logs or settings
+   - **This is the value you need for `OWA_DB_HOST`**
+
+2. **Set the environment variable correctly**:
+   - In Coolify, go to your **application** (not the database service)
+   - Go to Environment Variables
+   - Set `OWA_DB_HOST` to the exact database service name from step 1
+   - Example: `OWA_DB_HOST=db-z4s0okcsgwco4wcssk8ogg8c-093314688937`
+   - **Important**: Do NOT use `localhost`, `127.0.0.1`, or `db` - use the actual service name
 
 2. **Verify environment variables are set**:
    - In Coolify, go to your application settings

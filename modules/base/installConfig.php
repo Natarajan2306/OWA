@@ -125,6 +125,13 @@ class owa_installConfigController extends owa_installController {
 
         // Check DB connection status
         $db = owa_coreAPI::dbSingleton();
+        if (!$db) {
+            $this->set('error_msg', 'Database connection could not be established. Please check your database configuration parameters.');
+            $this->set('config', $this->params);
+            $this->setView('base.install');
+            $this->setSubview('base.installConfigEntry');
+            return;
+        }
         $db->connect();
         if ($db->connection_status != true) {
             // Get the actual error message from the database connection
