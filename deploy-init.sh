@@ -190,5 +190,43 @@ chmod -R 775 /var/www/html/owa-data 2>/dev/null || true
 chown -R www-data:www-data /var/www/html/owa-data 2>/dev/null || true
 chmod 777 /var/log/apache2 2>/dev/null || true
 
+# Reset admin user if environment variables are set
+if [ -n "$OWA_ADMIN_USER" ] && [ -n "$OWA_ADMIN_PASSWORD" ] && [ -n "$OWA_ADMIN_EMAIL" ]; then
+    echo ""
+    echo "=== Admin User Reset ==="
+    echo "Admin user environment variables detected."
+    echo "Resetting admin user..."
+    
+    # Wait a moment for database to be ready
+    sleep 2
+    
+    # Check if config file exists and database is configured
+    if [ -f "$CONFIG_FILE" ]; then
+        # Run the reset admin user script
+        cd /var/www/html
+        php reset_admin_user.php "$OWA_ADMIN_USER" "$OWA_ADMIN_PASSWORD" "$OWA_ADMIN_EMAIL" 2>&1
+        RESET_EXIT=$?
+        
+        if [ $RESET_EXIT -eq 0 ]; then
+            echo "Admin user reset completed successfully."
+        else
+            echo "WARNING: Admin user reset failed (exit code: $RESET_EXIT)."
+            echo "This might be because the database is not ready yet or installation is not complete."
+            echo "You can manually reset the admin user later using:"
+            echo "  php reset_admin_user.php $OWA_ADMIN_USER $OWA_ADMIN_PASSWORD $OWA_ADMIN_EMAIL"
+        fi
+    else
+        echo "WARNING: Config file not found. Skipping admin user reset."
+        echo "Admin user will be created during installation."
+    fi
+else
+    echo ""
+    echo "NOTE: Admin user environment variables not set."
+    echo "To automatically create/reset admin user on deployment, set:"
+    echo "  OWA_ADMIN_USER - Admin username"
+    echo "  OWA_ADMIN_PASSWORD - Admin password"
+    echo "  OWA_ADMIN_EMAIL - Admin email"
+fi
+
 echo "Deployment initialization complete."
 
