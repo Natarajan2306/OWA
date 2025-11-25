@@ -10,6 +10,7 @@ services:
     depends_on:
       - db
     environment:
+      - OWA_DB_TYPE=mysql
       - OWA_DB_HOST=db
       - OWA_DB_NAME=owa
       - OWA_DB_USER=owa_user

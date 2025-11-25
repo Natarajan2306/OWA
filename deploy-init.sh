@@ -22,54 +22,65 @@ if [ -f "$CONFIG_FILE" ]; then
     if [ -n "$OWA_DB_HOST" ] || [ -n "$OWA_DB_NAME" ] || [ -n "$OWA_DB_USER" ]; then
         echo "Environment variables detected. Updating config file..."
         
-        # Use sed to update the config file with environment variables
-        if [ -n "$OWA_DB_TYPE" ]; then
-            sed -i "s/define('OWA_DB_TYPE',.*);/define('OWA_DB_TYPE', '${OWA_DB_TYPE}');/" "$CONFIG_FILE" 2>/dev/null || true
-        fi
-        if [ -n "$OWA_DB_HOST" ]; then
-            sed -i "s/define('OWA_DB_HOST',.*);/define('OWA_DB_HOST', '${OWA_DB_HOST}');/" "$CONFIG_FILE" 2>/dev/null || true
-        fi
-        if [ -n "$OWA_DB_NAME" ]; then
-            sed -i "s/define('OWA_DB_NAME',.*);/define('OWA_DB_NAME', '${OWA_DB_NAME}');/" "$CONFIG_FILE" 2>/dev/null || true
-        fi
-        if [ -n "$OWA_DB_USER" ]; then
-            sed -i "s/define('OWA_DB_USER',.*);/define('OWA_DB_USER', '${OWA_DB_USER}');/" "$CONFIG_FILE" 2>/dev/null || true
-        fi
-        if [ -n "$OWA_DB_PASSWORD" ]; then
-            # Escape special characters in password for sed
-            ESCAPED_PASSWORD=$(echo "$OWA_DB_PASSWORD" | sed 's/[[\.*^$()+?{|]/\\&/g')
-            sed -i "s/define('OWA_DB_PASSWORD',.*);/define('OWA_DB_PASSWORD', '${ESCAPED_PASSWORD}');/" "$CONFIG_FILE" 2>/dev/null || true
-        fi
-        if [ -n "$OWA_DB_PORT" ]; then
-            sed -i "s/define('OWA_DB_PORT',.*);/define('OWA_DB_PORT', '${OWA_DB_PORT}');/" "$CONFIG_FILE" 2>/dev/null || true
-        fi
-        # Handle OWA_PUBLIC_URL - auto-detect if not set
-        if [ -n "$OWA_PUBLIC_URL" ]; then
-            sed -i "s|define('OWA_PUBLIC_URL',.*);|define('OWA_PUBLIC_URL', '${OWA_PUBLIC_URL}');|" "$CONFIG_FILE" 2>/dev/null || true
-        else
-            # Try to auto-detect from common environment variables
-            # Check for Coolify domain or other common variables
-            if [ -n "$DOMAIN" ]; then
-                # Use HTTPS if available, otherwise HTTP
-                PROTOCOL="https"
-                if [ -n "$FORCE_HTTPS" ] && [ "$FORCE_HTTPS" = "false" ]; then
-                    PROTOCOL="http"
-                fi
-                AUTO_URL="${PROTOCOL}://${DOMAIN}/"
-                sed -i "s|define('OWA_PUBLIC_URL',.*);|define('OWA_PUBLIC_URL', '${AUTO_URL}');|" "$CONFIG_FILE" 2>/dev/null || true
-                echo "Auto-detected public URL: ${AUTO_URL}"
-            elif [ -n "$APP_URL" ]; then
-                # Use APP_URL if available
-                sed -i "s|define('OWA_PUBLIC_URL',.*);|define('OWA_PUBLIC_URL', '${APP_URL}');|" "$CONFIG_FILE" 2>/dev/null || true
-                echo "Using APP_URL: ${APP_URL}"
+        # Use PHP script for more reliable config file updates
+        if [ -f "/var/www/html/update_config.php" ]; then
+            cd /var/www/html
+            php update_config.php 2>&1
+            UPDATE_EXIT=$?
+            if [ $UPDATE_EXIT -eq 0 ]; then
+                echo "Config file updated successfully using PHP script."
             else
-                # Fallback: use a placeholder that will be detected at runtime
-                sed -i "s|define('OWA_PUBLIC_URL',.*);|define('OWA_PUBLIC_URL', '');|" "$CONFIG_FILE" 2>/dev/null || true
-                echo "WARNING: OWA_PUBLIC_URL not set. Will be auto-detected at runtime."
+                echo "WARNING: PHP config update failed. Falling back to sed method..."
+                # Fallback to sed method
+                if [ -n "$OWA_DB_TYPE" ]; then
+                    sed -i "s/define('OWA_DB_TYPE',.*);/define('OWA_DB_TYPE', '${OWA_DB_TYPE}');/" "$CONFIG_FILE" 2>/dev/null || true
+                fi
+                if [ -n "$OWA_DB_HOST" ]; then
+                    sed -i "s/define('OWA_DB_HOST',.*);/define('OWA_DB_HOST', '${OWA_DB_HOST}');/" "$CONFIG_FILE" 2>/dev/null || true
+                fi
+                if [ -n "$OWA_DB_NAME" ]; then
+                    sed -i "s/define('OWA_DB_NAME',.*);/define('OWA_DB_NAME', '${OWA_DB_NAME}');/" "$CONFIG_FILE" 2>/dev/null || true
+                fi
+                if [ -n "$OWA_DB_USER" ]; then
+                    sed -i "s/define('OWA_DB_USER',.*);/define('OWA_DB_USER', '${OWA_DB_USER}');/" "$CONFIG_FILE" 2>/dev/null || true
+                fi
+                if [ -n "$OWA_DB_PASSWORD" ]; then
+                    ESCAPED_PASSWORD=$(echo "$OWA_DB_PASSWORD" | sed "s/'/\\\\'/g")
+                    sed -i "s/define('OWA_DB_PASSWORD',.*);/define('OWA_DB_PASSWORD', '${ESCAPED_PASSWORD}');/" "$CONFIG_FILE" 2>/dev/null || true
+                fi
+                if [ -n "$OWA_DB_PORT" ]; then
+                    sed -i "s/define('OWA_DB_PORT',.*);/define('OWA_DB_PORT', '${OWA_DB_PORT}');/" "$CONFIG_FILE" 2>/dev/null || true
+                fi
+                if [ -n "$OWA_PUBLIC_URL" ]; then
+                    sed -i "s|define('OWA_PUBLIC_URL',.*);|define('OWA_PUBLIC_URL', '${OWA_PUBLIC_URL}');|" "$CONFIG_FILE" 2>/dev/null || true
+                fi
+            fi
+        else
+            echo "WARNING: update_config.php not found. Using sed method..."
+            # Fallback to sed method
+            if [ -n "$OWA_DB_TYPE" ]; then
+                sed -i "s/define('OWA_DB_TYPE',.*);/define('OWA_DB_TYPE', '${OWA_DB_TYPE}');/" "$CONFIG_FILE" 2>/dev/null || true
+            fi
+            if [ -n "$OWA_DB_HOST" ]; then
+                sed -i "s/define('OWA_DB_HOST',.*);/define('OWA_DB_HOST', '${OWA_DB_HOST}');/" "$CONFIG_FILE" 2>/dev/null || true
+            fi
+            if [ -n "$OWA_DB_NAME" ]; then
+                sed -i "s/define('OWA_DB_NAME',.*);/define('OWA_DB_NAME', '${OWA_DB_NAME}');/" "$CONFIG_FILE" 2>/dev/null || true
+            fi
+            if [ -n "$OWA_DB_USER" ]; then
+                sed -i "s/define('OWA_DB_USER',.*);/define('OWA_DB_USER', '${OWA_DB_USER}');/" "$CONFIG_FILE" 2>/dev/null || true
+            fi
+            if [ -n "$OWA_DB_PASSWORD" ]; then
+                ESCAPED_PASSWORD=$(echo "$OWA_DB_PASSWORD" | sed "s/'/\\\\'/g")
+                sed -i "s/define('OWA_DB_PASSWORD',.*);/define('OWA_DB_PASSWORD', '${ESCAPED_PASSWORD}');/" "$CONFIG_FILE" 2>/dev/null || true
+            fi
+            if [ -n "$OWA_DB_PORT" ]; then
+                sed -i "s/define('OWA_DB_PORT',.*);/define('OWA_DB_PORT', '${OWA_DB_PORT}');/" "$CONFIG_FILE" 2>/dev/null || true
+            fi
+            if [ -n "$OWA_PUBLIC_URL" ]; then
+                sed -i "s|define('OWA_PUBLIC_URL',.*);|define('OWA_PUBLIC_URL', '${OWA_PUBLIC_URL}');|" "$CONFIG_FILE" 2>/dev/null || true
             fi
         fi
-        
-        echo "Config file updated with environment variables."
     fi
 else
     echo "Config file not found. Attempting to create from template..."
@@ -108,54 +119,36 @@ else
             if [ -n "$OWA_DB_HOST" ] || [ -n "$OWA_DB_NAME" ] || [ -n "$OWA_DB_USER" ]; then
                 echo "Environment variables detected. Updating config file..."
                 
-                # Use sed to update the config file with environment variables
-                if [ -n "$OWA_DB_TYPE" ]; then
-                    sed -i "s/define('OWA_DB_TYPE',.*);/define('OWA_DB_TYPE', '${OWA_DB_TYPE}');/" "$CONFIG_FILE" 2>/dev/null || true
-                fi
-                if [ -n "$OWA_DB_HOST" ]; then
-                    sed -i "s/define('OWA_DB_HOST',.*);/define('OWA_DB_HOST', '${OWA_DB_HOST}');/" "$CONFIG_FILE" 2>/dev/null || true
-                fi
-                if [ -n "$OWA_DB_NAME" ]; then
-                    sed -i "s/define('OWA_DB_NAME',.*);/define('OWA_DB_NAME', '${OWA_DB_NAME}');/" "$CONFIG_FILE" 2>/dev/null || true
-                fi
-                if [ -n "$OWA_DB_USER" ]; then
-                    sed -i "s/define('OWA_DB_USER',.*);/define('OWA_DB_USER', '${OWA_DB_USER}');/" "$CONFIG_FILE" 2>/dev/null || true
-                fi
-                if [ -n "$OWA_DB_PASSWORD" ]; then
-                    # Escape special characters in password for sed
-                    ESCAPED_PASSWORD=$(echo "$OWA_DB_PASSWORD" | sed 's/[[\.*^$()+?{|]/\\&/g')
-                    sed -i "s/define('OWA_DB_PASSWORD',.*);/define('OWA_DB_PASSWORD', '${ESCAPED_PASSWORD}');/" "$CONFIG_FILE" 2>/dev/null || true
-                fi
-                if [ -n "$OWA_DB_PORT" ]; then
-                    sed -i "s/define('OWA_DB_PORT',.*);/define('OWA_DB_PORT', '${OWA_DB_PORT}');/" "$CONFIG_FILE" 2>/dev/null || true
-                fi
-                # Handle OWA_PUBLIC_URL - auto-detect if not set
-                if [ -n "$OWA_PUBLIC_URL" ]; then
-                    sed -i "s|define('OWA_PUBLIC_URL',.*);|define('OWA_PUBLIC_URL', '${OWA_PUBLIC_URL}');|" "$CONFIG_FILE" 2>/dev/null || true
+                # Use PHP script for more reliable config file updates
+                if [ -f "/var/www/html/update_config.php" ]; then
+                    cd /var/www/html
+                    php update_config.php 2>&1
                 else
-                    # Try to auto-detect from common environment variables
-                    # Check for Coolify domain or other common variables
-                    if [ -n "$DOMAIN" ]; then
-                        # Use HTTPS if available, otherwise HTTP
-                        PROTOCOL="https"
-                        if [ -n "$FORCE_HTTPS" ] && [ "$FORCE_HTTPS" = "false" ]; then
-                            PROTOCOL="http"
-                        fi
-                        AUTO_URL="${PROTOCOL}://${DOMAIN}/"
-                        sed -i "s|define('OWA_PUBLIC_URL',.*);|define('OWA_PUBLIC_URL', '${AUTO_URL}');|" "$CONFIG_FILE" 2>/dev/null || true
-                        echo "Auto-detected public URL: ${AUTO_URL}"
-                    elif [ -n "$APP_URL" ]; then
-                        # Use APP_URL if available
-                        sed -i "s|define('OWA_PUBLIC_URL',.*);|define('OWA_PUBLIC_URL', '${APP_URL}');|" "$CONFIG_FILE" 2>/dev/null || true
-                        echo "Using APP_URL: ${APP_URL}"
-                    else
-                        # Fallback: use a placeholder that will be detected at runtime
-                        sed -i "s|define('OWA_PUBLIC_URL',.*);|define('OWA_PUBLIC_URL', '');|" "$CONFIG_FILE" 2>/dev/null || true
-                        echo "WARNING: OWA_PUBLIC_URL not set. Will be auto-detected at runtime."
+                    echo "WARNING: update_config.php not found. Using sed method..."
+                    # Fallback to sed method
+                    if [ -n "$OWA_DB_TYPE" ]; then
+                        sed -i "s/define('OWA_DB_TYPE',.*);/define('OWA_DB_TYPE', '${OWA_DB_TYPE}');/" "$CONFIG_FILE" 2>/dev/null || true
+                    fi
+                    if [ -n "$OWA_DB_HOST" ]; then
+                        sed -i "s/define('OWA_DB_HOST',.*);/define('OWA_DB_HOST', '${OWA_DB_HOST}');/" "$CONFIG_FILE" 2>/dev/null || true
+                    fi
+                    if [ -n "$OWA_DB_NAME" ]; then
+                        sed -i "s/define('OWA_DB_NAME',.*);/define('OWA_DB_NAME', '${OWA_DB_NAME}');/" "$CONFIG_FILE" 2>/dev/null || true
+                    fi
+                    if [ -n "$OWA_DB_USER" ]; then
+                        sed -i "s/define('OWA_DB_USER',.*);/define('OWA_DB_USER', '${OWA_DB_USER}');/" "$CONFIG_FILE" 2>/dev/null || true
+                    fi
+                    if [ -n "$OWA_DB_PASSWORD" ]; then
+                        ESCAPED_PASSWORD=$(echo "$OWA_DB_PASSWORD" | sed "s/'/\\\\'/g")
+                        sed -i "s/define('OWA_DB_PASSWORD',.*);/define('OWA_DB_PASSWORD', '${ESCAPED_PASSWORD}');/" "$CONFIG_FILE" 2>/dev/null || true
+                    fi
+                    if [ -n "$OWA_DB_PORT" ]; then
+                        sed -i "s/define('OWA_DB_PORT',.*);/define('OWA_DB_PORT', '${OWA_DB_PORT}');/" "$CONFIG_FILE" 2>/dev/null || true
+                    fi
+                    if [ -n "$OWA_PUBLIC_URL" ]; then
+                        sed -i "s|define('OWA_PUBLIC_URL',.*);|define('OWA_PUBLIC_URL', '${OWA_PUBLIC_URL}');|" "$CONFIG_FILE" 2>/dev/null || true
                     fi
                 fi
-                
-                echo "Config file updated with environment variables."
             fi
         else
             echo "WARNING: Config file was not created or was removed."
@@ -186,9 +179,14 @@ mkdir -p /var/www/html/owa-data/logs 2>/dev/null || true
 mkdir -p /var/www/html/owa-data/caches 2>/dev/null || true
 mkdir -p /var/log/apache2 2>/dev/null || true
 
-chmod -R 775 /var/www/html/owa-data 2>/dev/null || true
+# Set proper permissions - ensure www-data can write to logs
 chown -R www-data:www-data /var/www/html/owa-data 2>/dev/null || true
+chmod -R 777 /var/www/html/owa-data 2>/dev/null || true
 chmod 777 /var/log/apache2 2>/dev/null || true
+
+# Ensure logs directory is specifically writable
+chmod 777 /var/www/html/owa-data/logs 2>/dev/null || true
+chown www-data:www-data /var/www/html/owa-data/logs 2>/dev/null || true
 
 # Reset admin user if environment variables are set
 if [ -n "$OWA_ADMIN_USER" ] && [ -n "$OWA_ADMIN_PASSWORD" ] && [ -n "$OWA_ADMIN_EMAIL" ]; then
