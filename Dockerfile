@@ -25,8 +25,8 @@ RUN docker-php-ext-install pdo_mysql mysqli mbstring exif pcntl bcmath gd
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Enable Apache mod_rewrite
-RUN a2enmod rewrite
+# Enable Apache mod_rewrite and mod_remoteip for reverse proxy support
+RUN a2enmod rewrite remoteip
 
 # Increase Apache request line limit to handle long URLs (prevent 414 errors)
 RUN echo "LimitRequestLine 16384" >> /etc/apache2/apache2.conf

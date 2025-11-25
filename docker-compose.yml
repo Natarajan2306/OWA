@@ -15,6 +15,7 @@ services:
       - OWA_DB_USER=owa_user
       - OWA_DB_PASSWORD=owa_password
       - OWA_DB_PORT=3306
+      - OWA_PUBLIC_URL=https://analytics.pdevsecops.com/
     networks:
       - owa-network
     labels:
