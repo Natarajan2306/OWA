@@ -1,11 +1,12 @@
 <?php
 /**
- * Install OWA and Create User Script
+ * Force Install OWA Script
  * 
- * This script installs the OWA database schema and creates an admin user.
- * Usage: php install_and_create_user.php <user_id> <password> <email> [domain] [site_name]
+ * This script forces installation even if install_complete flag is set.
+ * Use this when the database tables are missing but the flag is set.
+ * Usage: php force_install.php <user_id> <password> <email> [domain] [site_name]
  * 
- * Example: php install_and_create_user.php admin mypassword123 admin@example.com analytics.pdevsecops.com "Practical DevSecOps"
+ * Example: php force_install.php admin mypassword123 admin@example.com analytics.pdevsecops.com "Practical DevSecOps"
  */
 
 require_once('owa_env.php');
@@ -13,7 +14,7 @@ require_once(OWA_DIR.'owa.php');
 
 // Get command line arguments
 if ($argc < 4) {
-    echo "Usage: php install_and_create_user.php <user_id> <password> <email> [domain] [site_name]\n";
+    echo "Usage: php force_install.php <user_id> <password> <email> [domain] [site_name]\n";
     echo "\n";
     echo "Arguments:\n";
     echo "  user_id   - Username for login (required)\n";
@@ -23,7 +24,7 @@ if ($argc < 4) {
     echo "  site_name - Display name for the site (optional, default: domain)\n";
     echo "\n";
     echo "Example:\n";
-    echo "  php install_and_create_user.php admin mypassword123 admin@example.com analytics.pdevsecops.com \"Practical DevSecOps\"\n";
+    echo "  php force_install.php admin mypassword123 admin@example.com analytics.pdevsecops.com \"Practical DevSecOps\"\n";
     exit(1);
 }
 
@@ -38,17 +39,10 @@ define('OWA_INSTALLING', true);
 $config = ['instance_role' => 'cli'];
 $owa = new owa($config);
 
-echo "Starting OWA installation...\n\n";
+echo "Force installing OWA (bypassing install check)...\n\n";
 
 // Get install manager
 $im = owa_coreAPI::supportClassFactory('base', 'installManager');
-
-// Check if already installed
-if ($im->isInstallComplete()) {
-    echo "OWA is already installed.\n";
-    echo "To create a new user, use: php create_user.php <user_id> <password> <email>\n";
-    exit(0);
-}
 
 // Check database connection
 $db = owa_coreAPI::dbSingleton();
@@ -65,6 +59,12 @@ if (!$db->connection_status) {
 }
 
 echo "Database connection: OK\n";
+
+// Clear install_complete flag first
+echo "Clearing install_complete flag...\n";
+$c = owa_coreAPI::configSingleton();
+$c->persistSetting('base', 'install_complete', false);
+$c->save();
 
 // Install schema
 echo "Installing database schema...\n";
@@ -90,10 +90,12 @@ if ($created_password === false) {
     $u->getByColumn('user_id', $user_id);
     
     if ($u->wasPersisted()) {
-        echo "User '$user_id' already exists. Updating password...\n";
+        echo "User '$user_id' already exists. Updating password and role...\n";
         $u->set('password', owa_lib::encryptPassword($password));
+        $u->set('role', 'admin');
+        $u->set('email_address', $email);
         $u->save();
-        echo "Password updated successfully.\n";
+        echo "User updated successfully.\n";
     } else {
         $ret = $u->createNewUser($user_id, 'admin', $password, $email, 'default admin');
         if ($ret) {
@@ -112,9 +114,15 @@ echo "Creating default site...\n";
 $im->createDefaultSite($domain, $site_name, 'Default Site', '');
 
 // Mark installation as complete
-$c = owa_coreAPI::configSingleton();
+echo "Marking installation as complete...\n";
 $c->persistSetting('base', 'install_complete', true);
-$c->save();
+$save_status = $c->save();
+
+if ($save_status !== true) {
+    echo "Warning: Could not persist install_complete flag to database.\n";
+} else {
+    echo "Installation marked as complete: OK\n";
+}
 
 echo "\n";
 echo "========================================\n";
@@ -125,7 +133,9 @@ echo "Login credentials:\n";
 echo "  Username: $user_id\n";
 echo "  Password: $password\n";
 echo "  Email: $email\n";
+echo "  Domain: $domain\n";
+echo "  Site Name: $site_name\n";
 echo "\n";
-echo "You can now log in at: http://localhost:8080/\n";
+echo "You can now log in at your OWA URL\n";
 echo "\n";
 

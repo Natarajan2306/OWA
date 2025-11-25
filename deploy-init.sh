@@ -195,23 +195,44 @@ if [ -n "$OWA_ADMIN_USER" ] && [ -n "$OWA_ADMIN_PASSWORD" ] && [ -n "$OWA_ADMIN_
     echo "Admin user environment variables detected."
     echo "Resetting admin user..."
     
-    # Wait a moment for database to be ready
-    sleep 2
+    # Wait longer for database to be ready (especially important in Docker)
+    echo "Waiting for database to be ready..."
+    sleep 5
     
     # Check if config file exists and database is configured
     if [ -f "$CONFIG_FILE" ]; then
-        # Run the reset admin user script
-        cd /var/www/html
-        php reset_admin_user.php "$OWA_ADMIN_USER" "$OWA_ADMIN_PASSWORD" "$OWA_ADMIN_EMAIL" 2>&1
-        RESET_EXIT=$?
+        # Try to create admin user with retries
+        MAX_RETRIES=3
+        RETRY_COUNT=0
+        RESET_EXIT=1
+        
+        while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ $RESET_EXIT -ne 0 ]; do
+            if [ $RETRY_COUNT -gt 0 ]; then
+                echo "Retry attempt $RETRY_COUNT of $MAX_RETRIES..."
+                sleep 3
+            fi
+            
+            # Run the reset admin user script
+            cd /var/www/html
+            php reset_admin_user.php "$OWA_ADMIN_USER" "$OWA_ADMIN_PASSWORD" "$OWA_ADMIN_EMAIL" 2>&1
+            RESET_EXIT=$?
+            
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+        done
         
         if [ $RESET_EXIT -eq 0 ]; then
             echo "Admin user reset completed successfully."
         else
-            echo "WARNING: Admin user reset failed (exit code: $RESET_EXIT)."
-            echo "This might be because the database is not ready yet or installation is not complete."
+            echo "WARNING: Admin user reset failed after $MAX_RETRIES attempts (exit code: $RESET_EXIT)."
+            echo "This might be because:"
+            echo "  1. The database is not ready yet"
+            echo "  2. The OWA installation has not been completed (database tables don't exist)"
+            echo "  3. There's a database connection issue"
+            echo ""
             echo "You can manually reset the admin user later using:"
             echo "  php reset_admin_user.php $OWA_ADMIN_USER $OWA_ADMIN_PASSWORD $OWA_ADMIN_EMAIL"
+            echo ""
+            echo "Or complete the installation via the web interface first."
         fi
     else
         echo "WARNING: Config file not found. Skipping admin user reset."

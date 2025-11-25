@@ -49,10 +49,38 @@ if (!$db->connection_status) {
     exit(1);
 }
 
+echo "Database connection successful.\n";
+
+// Check if the owa_user table exists by trying to query it
+$test_user = owa_coreAPI::entityFactory('base.user');
+$table_name = $test_user->getTableName();
+echo "Checking for table: $table_name\n";
+
+// Try a simple query to see if table exists
+try {
+    $db->selectFrom($table_name);
+    $db->selectColumn("COUNT(*) as count");
+    $result = $db->getOneRow();
+    echo "Database table '$table_name' exists.\n";
+} catch (Exception $e) {
+    $error_msg = $e->getMessage();
+    if (strpos($error_msg, "doesn't exist") !== false || 
+        strpos($error_msg, "Unknown table") !== false ||
+        strpos($error_msg, "Table") !== false && strpos($error_msg, "doesn't exist") !== false) {
+        echo "Error: Database table '$table_name' does not exist.\n";
+        echo "This means the OWA installation has not been completed yet.\n";
+        echo "Please complete the installation first by visiting the web interface.\n";
+        echo "The admin user will be created automatically during installation, or you can create it manually after installation.\n";
+        exit(1);
+    }
+    // If it's a different error, continue and let the create method handle it
+    echo "Warning: Error checking table (continuing anyway): " . $error_msg . "\n";
+}
+
 echo "Resetting admin user...\n";
 
 // Get all admin users
-$db->selectFrom('owa_user');
+$db->selectFrom($table_name);
 $db->selectColumn("*");
 $db->where('role', 'admin');
 $admin_users = $db->getAllRows();
@@ -88,6 +116,12 @@ if ($u->wasPersisted()) {
 // Create the new admin user
 try {
     $u = owa_coreAPI::entityFactory('base.user');
+    
+    // Try to enable better error reporting if method exists
+    if (method_exists($db, 'setErrorHandling')) {
+        $db->setErrorHandling('exception');
+    }
+    
     $ret = $u->createNewUser($user_id, 'admin', $password, $email, 'default admin');
     
     if ($ret) {
@@ -100,13 +134,41 @@ try {
         echo "  Role: admin\n";
         echo "\n";
     } else {
-        echo "Error: Failed to create admin user. Please check the database connection and try again.\n";
-        exit(1);
+        echo "Error: Failed to create admin user.\n";
+        
+        // Check if user already exists with different role
+        $check_user = owa_coreAPI::entityFactory('base.user');
+        $check_user->getByColumn('user_id', $user_id);
+        if ($check_user->wasPersisted()) {
+            echo "Note: A user with username '$user_id' already exists.\n";
+            echo "Attempting to delete and recreate...\n";
+            $check_user->delete();
+            // Try again
+            $u = owa_coreAPI::entityFactory('base.user');
+            $ret = $u->createNewUser($user_id, 'admin', $password, $email, 'default admin');
+            if ($ret) {
+                echo "Success! Admin user recreated successfully.\n";
+                echo "\n";
+                echo "Login credentials:\n";
+                echo "  Username: $user_id\n";
+                echo "  Password: $password\n";
+                echo "  Email: $email\n";
+                echo "  Role: admin\n";
+                echo "\n";
+            } else {
+                echo "Error: Still failed to create admin user after retry.\n";
+                exit(1);
+            }
+        } else {
+            echo "Please check the database connection and table structure.\n";
+            exit(1);
+        }
     }
 } catch (Exception $e) {
     echo "Error: " . $e->getMessage() . "\n";
+    echo "Stack trace:\n" . $e->getTraceAsString() . "\n";
     echo "\n";
-    echo "This might mean the database tables don't exist yet.\n";
+    echo "This might mean the database tables don't exist yet or have the wrong structure.\n";
     echo "Please run the installation first.\n";
     exit(1);
 }
