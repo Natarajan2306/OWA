@@ -19,7 +19,7 @@ services:
       - OWA_PUBLIC_URL=https://analytics.pdevsecops.com/
       # Admin user will be reset/created on each deployment if these are set
       - OWA_ADMIN_USER=admin
-      - OWA_ADMIN_PASSWORD=changeme123
+      - OWA_ADMIN_PASSWORD=0OLeb3cG4WQMWpCY
       - OWA_ADMIN_EMAIL=admin@example.com
     networks:
       - owa-network
