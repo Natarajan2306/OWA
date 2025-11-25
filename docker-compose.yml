@@ -1,93 +1,64 @@
-version: '3.8'
-
 services:
-web:
-build: .
-container_name: web-xook400kscgcgwoowsckgwkc-052507423694
-ports:
-- '8081:80'
-volumes:
-- '/data/coolify/applications/xook400kscgcgwoowsckgwkc/owa-data:/var/www/html/owa-data'
-- 'xook400kscgcgwoowsckgwkc_:/var/www/html'
-depends_on:
-- db
-environment:
-OWA_DB_HOST: db
-OWA_DB_NAME: owa
-OWA_DB_USER: owa_user
-OWA_DB_PASSWORD: owa_password
-OWA_DB_PORT: '3306'
-COOLIFY_BRANCH: '"main"'
-COOLIFY_RESOURCE_UUID: xook400kscgcgwoowsckgwkc
-COOLIFY_CONTAINER_NAME: web-xook400kscgcgwoowsckgwkc-052507423694
-COOLIFY_URL: '[http://analytics.pdevsecops.com](http://analytics.pdevsecops.com)'
-COOLIFY_FQDN: analytics.pdevsecops.com
-networks:
-owa-network: null
-xook400kscgcgwoowsckgwkc: null
-restart: unless-stopped
-labels:
-# Enable Traefik
-- traefik.enable=true
+  web:
+    build: .
+    container_name: owa-web
+    ports:
+      - "8081:80"
+    volumes:
+      - ./owa-data:/var/www/html/owa-data
+      - .:/var/www/html
+    depends_on:
+      - db
+    environment:
+      - OWA_DB_HOST=db
+      - OWA_DB_NAME=owa
+      - OWA_DB_USER=owa_user
+      - OWA_DB_PASSWORD=owa_password
+      - OWA_DB_PORT=3306
+    networks:
+      - owa-network
+    labels:
+      # Enable Traefik
+      - traefik.enable=true
+      # HTTP router → redirect to HTTPS
+      - traefik.http.routers.owa-http.entrypoints=http
+      - traefik.http.routers.owa-http.rule=Host(`analytics.pdevsecops.com`)
+      - traefik.http.routers.owa-http.middlewares=redirect-to-https
+      # HTTPS router → forward all paths to container
+      - traefik.http.routers.owa-https.entrypoints=websecure
+      - traefik.http.routers.owa-https.rule=Host(`analytics.pdevsecops.com`) && PathPrefix(`/`)
+      - traefik.http.routers.owa-https.tls=true
+      - traefik.http.routers.owa-https.middlewares=gzip
+      - traefik.http.services.owa.loadbalancer.server.port=80
+      # Gzip compression middleware
+      - traefik.http.middlewares.gzip.compress=true
+      # Optional HTTP→HTTPS redirect middleware
+      - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
 
-```
-  # HTTP router → redirect to HTTPS
-  - traefik.http.routers.owa-http.entrypoints=http
-  - traefik.http.routers.owa-http.rule=Host(`analytics.pdevsecops.com`)
-  - traefik.http.routers.owa-http.middlewares=redirect-to-https
-
-  # HTTPS router → forward all paths to container
-  - traefik.http.routers.owa-https.entrypoints=websecure
-  - traefik.http.routers.owa-https.rule=Host(`analytics.pdevsecops.com`) && PathPrefix(`/`)
-  - traefik.http.routers.owa-https.tls=true
-  - traefik.http.routers.owa-https.middlewares=gzip
-  - traefik.http.services.owa.loadbalancer.server.port=80
-
-  # Gzip compression middleware
-  - traefik.http.middlewares.gzip.compress=true
-
-  # Optional HTTP→HTTPS redirect middleware
-  - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
-```
-
-db:
-image: 'mysql:8.0'
-container_name: db-xook400kscgcgwoowsckgwkc-052507435166
-restart: always
-environment:
-MYSQL_DATABASE: owa
-MYSQL_USER: owa_user
-MYSQL_PASSWORD: owa_password
-MYSQL_ROOT_PASSWORD: root_password
-COOLIFY_BRANCH: '"main"'
-COOLIFY_RESOURCE_UUID: xook400kscgcgwoowsckgwkc
-COOLIFY_CONTAINER_NAME: db-xook400kscgcgwoowsckgwkc-052507435166
-volumes:
-- 'xook400kscgcgwoowsckgwkc_owa-db-data:/var/lib/mysql'
-ports:
-- '3307:3306'
-networks:
-owa-network: null
-xook400kscgcgwoowsckgwkc: null
-healthcheck:
-test:
-- CMD
-- mysqladmin
-- ping
-- '-h'
-- localhost
-timeout: 20s
-retries: 10
+  db:
+    image: mysql:8.0
+    container_name: owa-db
+    restart: always
+    environment:
+      MYSQL_DATABASE: owa
+      MYSQL_USER: owa_user
+      MYSQL_PASSWORD: owa_password
+      MYSQL_ROOT_PASSWORD: root_password
+    volumes:
+      - owa-db-data:/var/lib/mysql
+    ports:
+      - "3307:3306"
+    networks:
+      - owa-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
 
 volumes:
-xook400kscgcgwoowsckgwkc_:
-name: xook400kscgcgwoowsckgwkc_
-xook400kscgcgwoowsckgwkc_owa-db-data:
-name: xook400kscgcgwoowsckgwkc_owa-db-data
+  owa-db-data:
 
 networks:
-owa-network:
-driver: bridge
-xook400kscgcgwoowsckgwkc:
-name: xook400kscgcgwoowsckgwkc
-external: true
+  owa-network:
+    driver: bridge
+
